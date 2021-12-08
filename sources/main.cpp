@@ -5,45 +5,60 @@
 #include <core/algorithm.hpp>
 #include <graphics/api/swapchain.hpp>
 #include <imgui/backend.hpp>
+#include <sqlite3.h>
 
-int StraitXMain(Span<const char *> args){
-    Window window;
-    window.Open(1280, 720, "const char *title");
 
-    FramebufferChain chain(&window);
-    ImGuiBackend back(chain.Pass());
+struct AutoWindow: Window{
+    AutoWindow(int width, int height, const char *title){
+        Open(width, height, title);
+    }
 
-    static const auto s_Handler = [&window, &chain, &back](const Event &e){
-        if(e.Type == EventType::WindowClose)
-            window.Close();
-        if(e.Type == EventType::WindowResized)
-            chain.Recreate();
-        back.HandleEvent(e);
-    };
+    ~AutoWindow(){
+        if(IsOpen())
+            Close();
+    }
+};
 
-    window.SetEventsHanlder([](const Event &e){
-        s_Handler(e);
-    });
+class Application{
+private:
+    AutoWindow m_Window{1280, 720, "Brewery"};
+    FramebufferChain m_Swapchain{&m_Window};
+    ImGuiBackend m_Backend{m_Swapchain.Pass()};
+    float FramerateLimit = 60.f;
 
-    Semaphore begin, end;
+    Semaphore m_Begin, m_End;
+public:
+    Application(){
+        Function<void(const Event&)> handler;
+        handler.Bind<Application, &Application::OnEvent>(this);
+        m_Window.SetEventsHanlder(handler);
+    }
 
-    Clock cl;
-
-    const float FramerateLimit = 60.f;
-
-    for(;;){
-        float dt = cl.GetElapsedTime().AsSeconds();
-        cl.Restart();
-        Sleep(Seconds(Max(0.f, 2.f/FramerateLimit - dt)));
-        window.DispatchEvents();
-        if(!window.IsOpen())
-            break;
+    void Run(){
+        Clock cl;
         
-        chain.AcquireNext(&begin);
-        back.NewFrame(dt, Mouse::RelativePosition(window), window.Size());
+        for(;;){
+            float dt = cl.GetElapsedTime().AsSeconds();
+            cl.Restart();
 
+            Sleep(Seconds(Max(0.f, 2.f/FramerateLimit - dt)));
 
-        auto size = window.Size();
+            m_Window.DispatchEvents();
+            if(!m_Window.IsOpen())
+                break;
+        
+            m_Swapchain.AcquireNext(&m_Begin);
+            m_Backend.NewFrame(dt, Mouse::RelativePosition(m_Window), m_Window.Size());
+
+            OnImGui();
+
+            m_Backend.RenderFrame(m_Swapchain.CurrentFramebuffer(), &m_Begin, &m_End);
+            m_Swapchain.PresentCurrent(&m_End);
+        }
+    }
+
+    void OnImGui(){
+        auto size = m_Window.Size();
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
@@ -62,13 +77,22 @@ int StraitXMain(Span<const char *> args){
         ImGui::End();
 
         ImGui::PopStyleVar(2);
-
-
-        ImGui::ShowDemoWindow();
-
-        back.RenderFrame(chain.CurrentFramebuffer(), &begin, &end);
-        chain.PresentCurrent(&end);
     }
+
+    void OnEvent(const Event &e){
+        if(e.Type == EventType::WindowClose)
+            m_Window.Close();
+        if(e.Type == EventType::WindowResized)
+            m_Swapchain.Recreate();
+
+        m_Backend.HandleEvent(e);
+    }
+};
+
+int StraitXMain(Span<const char *> args){
+    Application app;
+
+    app.Run();
 
     return 0;
 }
