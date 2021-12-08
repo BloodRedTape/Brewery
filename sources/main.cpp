@@ -37,9 +37,29 @@ int StraitXMain(Span<const char *> args){
         chain.AcquireNext(&begin);
         back.NewFrame(dt, Mouse::RelativePosition(window), window.Size());
 
-        ImGui::Begin("Window");
 
+        auto size = window.Size();
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+        ImGui::SetNextWindowSize(ImVec2(size.x, size.y)); 
+        ImGui::SetNextWindowPos({0, 0});
+        ImGuiWindowFlags flags = 0;
+        flags |= ImGuiWindowFlags_NoTitleBar;
+        flags |= ImGuiWindowFlags_NoResize;
+        flags |= ImGuiWindowFlags_NoBringToFrontOnFocus;
+        flags |= ImGuiWindowFlags_NoMove;
+
+        ImGui::Begin("Brewery", nullptr, flags);
+        {
+            ImGui::DockSpace(ImGui::GetID("Dockspace"));
+        }
         ImGui::End();
+
+        ImGui::PopStyleVar(2);
+
+
+        ImGui::ShowDemoWindow();
 
         back.RenderFrame(chain.CurrentFramebuffer(), &begin, &end);
         chain.PresentCurrent(&end);
