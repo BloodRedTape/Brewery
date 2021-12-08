@@ -1,6 +1,8 @@
 #include <core/span.hpp>
 #include <core/os/clock.hpp>
 #include <core/os/window.hpp>
+#include <core/os/sleep.hpp>
+#include <core/algorithm.hpp>
 #include <graphics/api/swapchain.hpp>
 #include <imgui/backend.hpp>
 
@@ -27,9 +29,12 @@ int StraitXMain(Span<const char *> args){
 
     Clock cl;
 
+    const float FramerateLimit = 60.f;
+
     for(;;){
         float dt = cl.GetElapsedTime().AsSeconds();
         cl.Restart();
+        Sleep(Seconds(Max(0.f, 2.f/FramerateLimit - dt)));
         window.DispatchEvents();
         if(!window.IsOpen())
             break;
