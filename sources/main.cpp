@@ -9,6 +9,64 @@
 #include <sqlite3.h>
 #include <tuple>
 
+class QueryResult{
+private:
+    sqlite3_stmt *const m_Statement;
+public:
+    QueryResult(sqlite3_stmt *statement):
+        m_Statement(statement) 
+    {}
+
+    ~QueryResult(){
+        sqlite3_finalize(m_Statement);
+    }
+
+    bool Next(){
+        return sqlite3_step(m_Statement) == SQLITE_ROW;
+    }
+
+    void Reset(){
+        sqlite3_reset(m_Statement);
+    }
+
+    int GetColumnInt(size_t index)const{
+        return sqlite3_column_int(m_Statement, index);
+    }
+
+    const char *GetColumnString(size_t index)const{
+        return (const char*)sqlite3_column_text(m_Statement, index);
+    }
+
+    float GetColumnFloat(size_t index)const{
+        return sqlite3_column_double(m_Statement, index);
+    }
+
+    double GetColumnDouble(size_t index)const{
+        return sqlite3_column_double(m_Statement, index);
+    }
+};
+
+class Stmt{
+private:
+    static constexpr size_t s_BufferSize = 4096;
+    char m_Buffer[s_BufferSize];
+    int m_Written = 0;
+public:
+    template<typename ...Args>
+    Stmt(const char *fmt, Args&&...args){
+        const auto writer = [](char ch, void *user_data){
+            Stmt *stmt = (Stmt*)user_data;
+            stmt->m_Buffer[stmt->m_Written++] = ch;
+        };
+
+        WriterPrint(writer, &m_Buffer, fmt, Forward<Args>(args)...);
+    }
+
+    operator const char *()const{
+        return m_Buffer;
+    }
+};
+
 class Database{
 private:
     sqlite3 *m_Handle = nullptr;
@@ -24,31 +82,22 @@ public:
         sqlite3_close(m_Handle);
     }
 
-    template<typename...ArgsType>
-    bool Execute(const char *fmt, ArgsType&&...args){
-        const size_t buffer_size = 4096;
-        struct Buffer{
-            size_t Written = 0;
-            char Data[buffer_size];
-        }buffer;
-
-        buffer.Data[0] = 0;
-
-        auto writer = [](char ch, void *user_data){
-            Buffer *buffer = (Buffer*)user_data;
-            buffer->Data[buffer->Written++] = ch;
-        };
-
-        WriterPrint(writer, &buffer, fmt, Forward<ArgsType>(args)...);
-
+    bool Execute(const Stmt &stmt){
         char *message = nullptr;
-        if(sqlite3_exec(m_Handle, buffer.Data, nullptr, nullptr,&message) != SQLITE_OK){
+        if(sqlite3_exec(m_Handle, stmt, nullptr, nullptr, &message) != SQLITE_OK){
             Println("SQLite3: %", message);
             sqlite3_free(message);
             return false;
         }
 
         return true;
+    }
+    
+    QueryResult Query(const Stmt &stmt){
+        sqlite3_stmt *sqlite_stmt = nullptr;
+        sqlite3_prepare_v2(m_Handle, stmt, -1, &sqlite_stmt, nullptr);
+
+        return {sqlite_stmt};
     }
 };
 
