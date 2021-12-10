@@ -9,24 +9,51 @@
 #include <sqlite3.h>
 #include <tuple>
 
+template<size_t SizeValue>
+class InputBuffer{
+private:
+    char m_Data[SizeValue];
+public:
+    InputBuffer(){
+        m_Data[0] = 0;
+    }
+
+    size_t Size()const{
+        return SizeValue;
+    }
+
+    char *Data(){
+        return m_Data;
+    }
+};
+
 class QueryResult{
 private:
     sqlite3_stmt *const m_Statement;
+
+    bool m_Status;
 public:
     QueryResult(sqlite3_stmt *statement):
         m_Statement(statement) 
-    {}
+    {
+        Reset();
+    }
 
     ~QueryResult(){
         sqlite3_finalize(m_Statement);
     }
 
-    bool Next(){
-        return sqlite3_step(m_Statement) == SQLITE_ROW;
+    void Next(){
+        m_Status = sqlite3_step(m_Statement) == SQLITE_ROW;
     }
 
     void Reset(){
         sqlite3_reset(m_Statement);
+        Next();
+    }
+
+    operator bool()const{
+        return m_Status;
     }
 
     int GetColumnInt(size_t index)const{
@@ -142,6 +169,80 @@ public:
     }
 };
 
+struct AddDrinkView{
+    static constexpr size_t BufferSize = 1024;
+
+    InputBuffer<BufferSize> DrinkName;
+    float PricePerLiter;
+    int AgeRestriction;
+
+    bool Draw(){
+
+        ImGui::InputText("Name", DrinkName.Data(), DrinkName.Size());
+        ImGui::InputFloat("PricePerLiter", &PricePerLiter);
+        ImGui::InputInt("AgeRestriction", &AgeRestriction);
+
+        bool btn = ImGui::Button("Add");
+
+        return btn;
+    }
+};
+
+class DrinksListPanel{
+private:
+    Database &m_Database;
+    int m_LastID = 0;
+    AddDrinkView m_AddDrinkPanel;
+public:
+    DrinksListPanel(Database &db):
+        m_Database(db) 
+    {}
+
+    void Draw(){
+        ImGui::Begin("Drinks");
+
+        if(m_AddDrinkPanel.Draw())
+            InsertDrinkAndUpdateQuery();
+
+        ImGui::Separator();
+
+        if(ImGui::Button("Clear"))
+            m_Database.Execute(Stmt("DELETE FROM Drinks"));
+        
+        ImGui::Separator();
+
+        QueryResult query = m_Database.Query(Stmt("SELECT * FROM Drinks"));
+
+        if(ImGui::BeginTable("Drinks", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
+            for( ;query; query.Next()){
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", query.GetColumnString(1)); 
+                ImGui::TableNextColumn();
+                ImGui::Text("%f", query.GetColumnFloat(2)); 
+                ImGui::TableNextColumn();
+                ImGui::Text("%d", query.GetColumnInt(3)); 
+            }
+            ImGui::EndTable();
+        }
+
+        ImGui::End();
+    }
+private:
+
+    void InsertDrinkAndUpdateQuery(){
+        m_Database.Execute(
+            Stmt(
+                "INSERT INTO Drinks(ID, Name, PricePerLiter, AgeRestriction) VALUES(%,'%',%,%)",
+                ++m_LastID,
+                m_AddDrinkPanel.DrinkName.Data(),
+                m_AddDrinkPanel.PricePerLiter,
+                m_AddDrinkPanel.AgeRestriction
+            )
+        );
+    }
+};
+
 class Application{
 private:
     AutoWindow m_Window{1280, 720, "Brewery"};
@@ -154,6 +255,7 @@ private:
     Database m_DB{"brewery.sqlite"};
 
     RawVar<Dockspace> m_Dockspace;
+    DrinksListPanel m_DrinksList{m_DB};
 public:
     Application(){
         Function<void(const Event&)> handler;
@@ -189,6 +291,7 @@ public:
 
     void OnImGui(){
         m_Dockspace->Draw();
+        m_DrinksList.Draw();
     }
 
     void OnEvent(const Event &e){

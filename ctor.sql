@@ -5,33 +5,27 @@ CREATE TABLE Addresses(
     PostalCode int
 );
 
-CREATE TABLE Units(
-    ID int PRIMARY KEY NOT NULL,
-    Name varchar(64)
-);
-
 CREATE TABLE Sources(
     ID int PRIMARY KEY NOT NULL,
     Name varchar(64),
-    AddressID int REFERENCES Addresses(ID)
+    AddressID REFERENCES Addresses(ID)
 );
 
 CREATE TABLE Ingredients(
-    ID int PRIMARY KEY NOT NULL,
-    Name varchar(64),
-    UnitID int REFERENCES Units(ID),
-    SourceID int REFERENCES Sources(ID)
+    Name varchar(64) PRIMARY KEY NOT NULL,
+    Units varchar(64) NOT NULL,
+    SourceID REFERENCES Sources(ID)
 );
 
 CREATE TABLE IngredientStorages(
     Name varchar(256) PRIMARY KEY NOT NULL,
-    IngredientID REFERENCES Ingredients(ID),
+    IngredientName REFERENCES Ingredients(Name),
     UnitsCount float
 );
 
 CREATE TABLE IngredientPortions(
     ID int PRIMARY KEY,
-    IngredientID REFERENCES Ingredients(ID),
+    IngredientName REFERENCES Ingredients(Name),
     UnitsCount float
 );
 
@@ -44,7 +38,7 @@ CREATE TABLE Drinks(
 
 CREATE TABLE IngredientsDrinks(
     IngredientPortionID int REFERENCES IngredientPortions(ID),
-    DrinkID int REFERENCES Drinks(ID)
+    DrinkID REFERENCES Drinks(ID)
 );
 
 CREATE TABLE Waiters(
@@ -56,13 +50,14 @@ CREATE TABLE Waiters(
 
 CREATE TABLE Goblets(
     ID int PRIMARY KEY NOT NULL,
+    Name varchar(64),
     Capacity float
 );
 
 CREATE TABLE DrinkOrders(
     ID int PRIMARY KEY NOT NULL,
-    DrinkID int REFERENCES Drinks(ID),
-    GobletID int REFERENCES Goblets(ID)
+    DrinkID REFERENCES Drinks(ID),
+    GobletID REFERENCES Goblets(ID)
 );
 
 CREATE TABLE OrdersLog(
