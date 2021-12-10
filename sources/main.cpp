@@ -169,30 +169,51 @@ public:
     }
 };
 
-struct AddDrinkView{
+class AddDrinkView{
     static constexpr size_t BufferSize = 1024;
+private:
+    Database &m_Database;
+    InputBuffer<BufferSize> m_DrinkName;
+    float m_PricePerLiter = 0.f;
+    int m_AgeRestriction = 0;
 
-    InputBuffer<BufferSize> DrinkName;
-    float PricePerLiter;
-    int AgeRestriction;
+    int m_LastID = 0;
+public:
+    AddDrinkView(Database &db):
+        m_Database(db)
+    {}
 
-    bool Draw(){
+    void Draw(){
 
-        ImGui::InputText("Name", DrinkName.Data(), DrinkName.Size());
-        ImGui::InputFloat("PricePerLiter", &PricePerLiter);
-        ImGui::InputInt("AgeRestriction", &AgeRestriction);
+        ImGui::InputText("Name", m_DrinkName.Data(), m_DrinkName.Size());
+        ImGui::InputFloat("PricePerLiter", &m_PricePerLiter);
+        ImGui::InputInt("AgeRestriction", &m_AgeRestriction);
 
-        bool btn = ImGui::Button("Add");
+        if(ImGui::Button("Add")){
+            m_Database.Execute(
+                Stmt(
+                    "INSERT INTO Drinks(ID, Name, PricePerLiter, AgeRestriction) VALUES(%,'%',%,%)",
+                    ++m_LastID,
+                    m_DrinkName.Data(),
+                    m_PricePerLiter,
+                    m_AgeRestriction
+                )
+            );
+        }
 
-        return btn;
+        ImGui::Separator();
+
+        if(ImGui::Button("Clear")){
+            m_Database.Execute(Stmt("DELETE FROM Drinks"));
+            m_LastID = 0;
+        }
     }
 };
 
 class DrinksListPanel{
 private:
     Database &m_Database;
-    int m_LastID = 0;
-    AddDrinkView m_AddDrinkPanel;
+    AddDrinkView m_AddDrinkPanel{m_Database};
 public:
     DrinksListPanel(Database &db):
         m_Database(db) 
@@ -201,13 +222,7 @@ public:
     void Draw(){
         ImGui::Begin("Drinks");
 
-        if(m_AddDrinkPanel.Draw())
-            InsertDrinkAndUpdateQuery();
-
-        ImGui::Separator();
-
-        if(ImGui::Button("Clear"))
-            m_Database.Execute(Stmt("DELETE FROM Drinks"));
+        m_AddDrinkPanel.Draw();
         
         ImGui::Separator();
 
@@ -227,19 +242,6 @@ public:
         }
 
         ImGui::End();
-    }
-private:
-
-    void InsertDrinkAndUpdateQuery(){
-        m_Database.Execute(
-            Stmt(
-                "INSERT INTO Drinks(ID, Name, PricePerLiter, AgeRestriction) VALUES(%,'%',%,%)",
-                ++m_LastID,
-                m_AddDrinkPanel.DrinkName.Data(),
-                m_AddDrinkPanel.PricePerLiter,
-                m_AddDrinkPanel.AgeRestriction
-            )
-        );
     }
 };
 
