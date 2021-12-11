@@ -8,6 +8,8 @@
 #include <imgui/backend.hpp>
 #include <sqlite3.h>
 #include <tuple>
+#include <core/list.hpp>
+#include <string>
 
 template<size_t SizeValue>
 class InputBuffer{
@@ -15,15 +17,23 @@ private:
     char m_Data[SizeValue];
 public:
     InputBuffer(){
-        m_Data[0] = 0;
+        Clear();
     }
 
     size_t Size()const{
         return SizeValue;
     }
 
+    size_t Length()const{
+        return strlen(m_Data);
+    }
+
     char *Data(){
         return m_Data;
+    }
+
+    void Clear(){
+        m_Data[0] = 0;
     }
 };
 
@@ -128,6 +138,157 @@ public:
     }
 };
 
+class DrinksTableMediator{
+private:
+    Database &m_Database;
+public:
+    DrinksTableMediator(Database &db):
+        m_Database(db)
+    {}
+
+    QueryResult Query(){
+        return m_Database.Query(Stmt("SELECT * FROM Drinks"));
+    }
+
+    QueryResult Query(int id){
+        return m_Database.Query(Stmt("SELECT * FROM Drinks WHERE ID = %", id));
+    }
+
+    QueryResult Query(const char *name){
+        return m_Database.Query(Stmt("SELECT * FROM Drinks WHERE Name = %", name));
+    }
+
+    void Clear(){
+        m_Database.Execute(Stmt("DELETE FROM Drinks"));
+    }
+
+    void Add(int id, const char *name, float price_per_liter, int age_restriction){
+        m_Database.Execute(
+            Stmt(
+                "INSERT INTO Drinks(ID, Name, PricePerLiter, AgeRestriction) VALUES(%,'%',%,%)",
+                id,
+                name,
+                price_per_liter,
+                age_restriction 
+            )
+        );
+    }
+};
+
+class OrdersLogTableMediator{
+private:
+    Database &m_Database;
+public:
+    OrdersLogTableMediator(Database &db):
+        m_Database(db)
+    {}
+
+    QueryResult Query(){
+        return m_Database.Query(Stmt("SELECT * FROM OrdersLog"));
+    }
+
+    void Clear(){
+        m_Database.Execute(Stmt("DELETE FROM OrdersLog"));
+    }
+
+    void Add(int id, const char *customer_name, float tips, int waiter_id){
+        m_Database.Execute(
+            Stmt(
+                "INSERT INTO OrdersLog(ID, CustomerShortName, Tips, WaiterID) VALUES(%,'%',%,%)",
+                id,
+                customer_name,
+                tips,
+                waiter_id 
+            )
+        );
+    }
+};
+
+class DrinkOrdersTableMediator{
+private:
+    Database &m_Database;
+public:
+    DrinkOrdersTableMediator(Database &db):
+        m_Database(db)
+    {}
+
+    QueryResult Query(int id){
+        return m_Database.Query(Stmt("SELECT * FROM DrinkOrders WHERE ID=%", id));
+    }
+
+    void Clear(){
+        m_Database.Execute(Stmt("DELETE FROM DrinkOrders"));
+    }
+
+    void Add(int id, int drink_id, int goblet_id){
+        m_Database.Execute(
+            Stmt(
+                "INSERT INTO DrinkOrders(ID, DrinkID, GobletID) VALUES(%, %, %)",
+                id,
+                drink_id,
+                goblet_id 
+            )
+        );
+    }
+};
+
+class OrderDrinksTableMediator{
+private:
+    Database &m_Database;
+public:
+    OrderDrinksTableMediator(Database &db):
+        m_Database(db)
+    {}
+
+    QueryResult Query(){
+        return m_Database.Query(Stmt("SELECT * FROM OrderDrinks"));
+    }
+
+    QueryResult Query(int order_id){
+        return m_Database.Query(Stmt("SELECT * FROM OrderDrinks WHERE OrderID = %", order_id));
+    }
+
+    void Clear(){
+        m_Database.Execute(Stmt("DELETE FROM OrderDrinks"));
+    }
+
+    void Add(int order_id, int drink_order_id){
+        m_Database.Execute(
+            Stmt(
+                "INSERT INTO OrderDrinks(OrderID, DrinkOrderID) VALUES(%, %)",
+                order_id,
+                drink_order_id
+            )
+        );
+    }
+};
+
+
+class GobletsTableMediator{
+private:
+    Database &m_Database;
+public:
+    GobletsTableMediator(Database &db):
+        m_Database(db)
+    {}
+
+    QueryResult Query(){
+        return m_Database.Query(Stmt("SELECT * FROM Goblets"));
+    }
+
+    QueryResult Query(int id){
+        return m_Database.Query(Stmt("SELECT * FROM Goblets WHERE ID = %", id));
+    }
+
+    QueryResult Query(const char *name){
+        return m_Database.Query(Stmt("SELECT * FROM Goblets WHERE Name = %", name));
+    }
+
+    void Clear(){
+        m_Database.Execute(Stmt("DELETE FROM Goblets"));
+    }
+};
+
 struct AutoWindow: Window{
     AutoWindow(int width, int height, const char *title){
         Open(width, height, title);
@@ -172,7 +333,7 @@ public:
 class AddDrinkView{
     static constexpr size_t BufferSize = 1024;
 private:
-    Database &m_Database;
+    DrinksTableMediator m_DrinksTable;
     InputBuffer<BufferSize> m_DrinkName;
     float m_PricePerLiter = 0.f;
     int m_AgeRestriction = 0;
@@ -180,31 +341,27 @@ private:
     int m_LastID = 0;
 public:
     AddDrinkView(Database &db):
-        m_Database(db)
+        m_DrinksTable(db)
     {}
 
     void Draw(){
-
         ImGui::InputText("Name", m_DrinkName.Data(), m_DrinkName.Size());
         ImGui::InputFloat("PricePerLiter", &m_PricePerLiter);
         ImGui::InputInt("AgeRestriction", &m_AgeRestriction);
 
         if(ImGui::Button("Add")){
-            m_Database.Execute(
-                Stmt(
-                    "INSERT INTO Drinks(ID, Name, PricePerLiter, AgeRestriction) VALUES(%,'%',%,%)",
-                    ++m_LastID,
-                    m_DrinkName.Data(),
-                    m_PricePerLiter,
-                    m_AgeRestriction
-                )
+            m_DrinksTable.Add(
+                ++m_LastID,
+                m_DrinkName.Data(),
+                m_PricePerLiter,
+                m_AgeRestriction
             );
         }
 
         ImGui::Separator();
 
         if(ImGui::Button("Clear")){
-            m_Database.Execute(Stmt("DELETE FROM Drinks"));
+            m_DrinksTable.Clear();
             m_LastID = 0;
         }
     }
@@ -212,11 +369,12 @@ public:
 
 class DrinksListPanel{
 private:
-    Database &m_Database;
-    AddDrinkView m_AddDrinkPanel{m_Database};
+    DrinksTableMediator m_DrinksTable;
+    AddDrinkView m_AddDrinkPanel;
 public:
     DrinksListPanel(Database &db):
-        m_Database(db) 
+        m_DrinksTable(db),
+        m_AddDrinkPanel(db)
     {}
 
     void Draw(){
@@ -226,7 +384,7 @@ public:
         
         ImGui::Separator();
 
-        QueryResult query = m_Database.Query(Stmt("SELECT * FROM Drinks"));
+        QueryResult query = m_DrinksTable.Query();
 
         if(ImGui::BeginTable("Drinks", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
             for( ;query; query.Next()){
@@ -245,6 +403,191 @@ public:
     }
 };
 
+struct DrinkOrder{
+    int DrinkID;
+    int GobletID;
+};
+
+std::string GetGobletName(const QueryResult &query){
+    if(!query)return "None";
+
+    return query.GetColumnString(1) + std::string(" ") + std::to_string(query.GetColumnFloat(2)) + "l";
+}
+
+class NewOrderView{
+    static constexpr size_t BufferSize = 1024;
+private:
+    DrinksTableMediator m_DrinksTable;
+    GobletsTableMediator m_GobletsTable;
+    DrinkOrdersTableMediator m_DrinksOrdersTable;
+    OrdersLogTableMediator m_OrdersLogTable;
+    OrderDrinksTableMediator m_OrderDrinksTable;
+
+    InputBuffer<BufferSize> m_CustomerName;
+    InputBuffer<BufferSize> m_WaiterName;
+    float m_Tips = 0.f;
+
+    List<DrinkOrder> m_Drinks;
+
+    int m_CurrentDrinkID = -1;
+    int m_CurrentGobletID = -1;
+
+    int m_LastDrinksOrderID = 0;
+    int m_LastOrderLogID = 0;
+public:
+    NewOrderView(Database &db):
+        m_DrinksTable(db),
+        m_GobletsTable(db),
+        m_DrinksOrdersTable(db),
+        m_OrdersLogTable(db),
+        m_OrderDrinksTable(db)
+    {}
+
+    void Draw(){
+        ImGui::InputText("CustomerName", m_CustomerName.Data(), m_CustomerName.Size());
+        ImGui::InputText("WaiterName", m_WaiterName.Data(), m_WaiterName.Size());
+        ImGui::InputFloat("Tips", &m_Tips);
+
+        if(m_Drinks.Size()
+        && ImGui::BeginTable("Drinks", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
+            for(const auto &drink: m_Drinks){
+                auto drink_query = m_DrinksTable.Query(drink.DrinkID);
+                auto goblet_query = m_GobletsTable.Query(drink.GobletID);
+
+                if(!drink_query || !goblet_query)continue;
+
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", drink_query.GetColumnString(1));
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", goblet_query.GetColumnString(1));
+                ImGui::TableNextColumn();
+                ImGui::Text("%.1f", goblet_query.GetColumnFloat(2));
+            }
+            ImGui::EndTable();
+        }
+
+
+
+        auto selected_drink_query = m_DrinksTable.Query(m_CurrentDrinkID);
+
+        ImGui::PushItemWidth(ImGui::GetWindowSize().x / 3);
+
+        if(ImGui::BeginCombo("##DrinksCombo", selected_drink_query ? selected_drink_query.GetColumnString(1) : "None")){
+            auto drink_query = m_DrinksTable.Query();
+            for(;drink_query; drink_query.Next()){
+                int id = drink_query.GetColumnInt(0);
+                const char *name = drink_query.GetColumnString(1);
+
+                if(ImGui::Selectable(name))
+                    m_CurrentDrinkID = id;
+            }
+            ImGui::EndCombo();
+        }
+
+        ImGui::SameLine();
+        
+        if(ImGui::BeginCombo("##GobletsCombo", GetGobletName(m_GobletsTable.Query(m_CurrentGobletID)).c_str())){
+            auto goblet_query = m_GobletsTable.Query();
+            for(;goblet_query; goblet_query.Next()){
+                int id = goblet_query.GetColumnInt(0);
+                std::string name = GetGobletName(goblet_query);
+
+                if(ImGui::Selectable(name.c_str()))
+                    m_CurrentGobletID = id;
+            }
+            ImGui::EndCombo();
+        }
+
+        ImGui::SameLine();
+
+        if(ImGui::Button("Add"))
+            if(m_CurrentGobletID != -1 && m_CurrentDrinkID != -1)
+                m_Drinks.Add({m_CurrentDrinkID, m_CurrentGobletID});
+
+        ImGui::PopItemWidth();
+
+        if(ImGui::Button("Place Order") && IsDataValid()){
+            m_OrdersLogTable.Add(++m_LastOrderLogID, m_CustomerName.Data(), m_Tips, 1);
+            
+            for(auto drink: m_Drinks){
+                m_DrinksOrdersTable.Add(++m_LastDrinksOrderID, drink.DrinkID, drink.GobletID);
+                m_OrderDrinksTable.Add(m_LastOrderLogID, m_LastDrinksOrderID);
+            }
+        }
+    }
+private:
+    bool IsDataValid(){
+        return m_Drinks.Size() && m_CustomerName.Length() && m_WaiterName.Length();
+    }
+};
+
+class OrdersLogPanel{
+private:
+    DrinkOrdersTableMediator m_DrinkOrders;
+    OrdersLogTableMediator m_OrdersLog;
+    OrderDrinksTableMediator m_OrderDrinks;
+    DrinksTableMediator m_DrinksTable;
+    GobletsTableMediator m_GobletsTable;
+    NewOrderView m_NewOrderView;
+public:
+    OrdersLogPanel(Database &db):
+        m_DrinkOrders(db),
+        m_OrdersLog(db),
+        m_OrderDrinks(db),
+        m_DrinksTable(db),
+        m_GobletsTable(db),
+        m_NewOrderView(db)
+    {}
+
+    void Draw(){
+        ImGui::Begin("New Order");
+        
+        m_NewOrderView.Draw();
+
+        ImGui::Separator();
+
+        QueryResult query = m_OrdersLog.Query();
+
+        for( ;query; query.Next()){
+            int id = query.GetColumnInt(0);
+            const char *customer_name = query.GetColumnString(1);
+            float tips = query.GetColumnFloat(2);
+            int waiter_id = query.GetColumnInt(3);
+            ImGui::Text("CustomerName: %s", customer_name);
+            ImGui::Text("Tips: %f", tips);
+
+            if(ImGui::BeginTable("##Drinks_", 3)){
+                
+                QueryResult drink_order = m_OrderDrinks.Query(id);
+
+                int drink_order_id = drink_order.GetColumnInt(1);
+
+                QueryResult drinks = m_DrinkOrders.Query(drink_order_id);
+
+                QueryResult drink = m_DrinksTable.Query(drinks.GetColumnInt(1));
+                QueryResult goblet = m_GobletsTable.Query(drinks.GetColumnInt(2));
+
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", drink.GetColumnString(1));
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", goblet.GetColumnString(1));
+                ImGui::TableNextColumn();
+                ImGui::Text("%f", goblet.GetColumnFloat(2));
+
+                ImGui::EndTable();
+            }
+
+            ImGui::Separator();
+        }
+
+        ImGui::End();
+        
+
+    }
+};
+
 class Application{
 private:
     AutoWindow m_Window{1280, 720, "Brewery"};
@@ -258,6 +601,7 @@ private:
 
     RawVar<Dockspace> m_Dockspace;
     DrinksListPanel m_DrinksList{m_DB};
+    OrdersLogPanel m_OrdersLog{m_DB};
 public:
     Application(){
         Function<void(const Event&)> handler;
@@ -294,6 +638,8 @@ public:
     void OnImGui(){
         m_Dockspace->Draw();
         m_DrinksList.Draw();
+        m_OrdersLog.Draw();
+        //ImGui::ShowDemoWindow();
     }
 
     void OnEvent(const Event &e){
