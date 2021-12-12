@@ -445,27 +445,6 @@ public:
         ImGui::InputText("WaiterName", m_WaiterName.Data(), m_WaiterName.Size());
         ImGui::InputFloat("Tips", &m_Tips);
 
-        if(m_Drinks.Size()
-        && ImGui::BeginTable("Drinks", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
-            for(const auto &drink: m_Drinks){
-                auto drink_query = m_DrinksTable.Query(drink.DrinkID);
-                auto goblet_query = m_GobletsTable.Query(drink.GobletID);
-
-                if(!drink_query || !goblet_query)continue;
-
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::Text("%s", drink_query.GetColumnString(1));
-                ImGui::TableNextColumn();
-                ImGui::Text("%s", goblet_query.GetColumnString(1));
-                ImGui::TableNextColumn();
-                ImGui::Text("%.1f", goblet_query.GetColumnFloat(2));
-            }
-            ImGui::EndTable();
-        }
-
-
-
         auto selected_drink_query = m_DrinksTable.Query(m_CurrentDrinkID);
 
         ImGui::PushItemWidth(ImGui::GetWindowSize().x / 3);
@@ -503,6 +482,25 @@ public:
                 m_Drinks.Add({m_CurrentDrinkID, m_CurrentGobletID});
 
         ImGui::PopItemWidth();
+
+        if(m_Drinks.Size()
+        && ImGui::BeginTable("Drinks", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
+            for(const auto &drink: m_Drinks){
+                auto drink_query = m_DrinksTable.Query(drink.DrinkID);
+                auto goblet_query = m_GobletsTable.Query(drink.GobletID);
+
+                if(!drink_query || !goblet_query)continue;
+
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", drink_query.GetColumnString(1));
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", goblet_query.GetColumnString(1));
+                ImGui::TableNextColumn();
+                ImGui::Text("%.1f", goblet_query.GetColumnFloat(2));
+            }
+            ImGui::EndTable();
+        }
 
         if(ImGui::Button("Place Order") && IsDataValid()){
             m_LastOrderLogID++;
