@@ -105,14 +105,41 @@ public:
     }
 };
 
+class DatabaseLogger{
+private:
+    List<std::string> m_Lines;
+public:
+
+    template<typename ...ArgsType>
+    void Log(const char *fmt, ArgsType&&...args){
+        std::string buffer;
+
+        const auto writer = [](char ch, void *data){
+            std::string &buffer = *(std::string*)data;
+            buffer.push_back(ch);
+        };
+
+        WriterPrint(writer, &buffer, fmt, Forward<ArgsType>(args)...);
+
+        m_Lines.Add(Move(buffer));
+    }
+
+    const List<std::string> &Lines()const{
+        return m_Lines;
+    }
+};
+
 class Database{
 private:
     sqlite3 *m_Handle = nullptr;
+    DatabaseLogger &m_Logger;
 
     using CallbackType = Function<void(int, char**, char**)>;
 public:
 
-    Database(const char *filepath){
+    Database(const char *filepath, DatabaseLogger &logger):
+        m_Logger(logger)
+    {
         sqlite3_open(filepath, &m_Handle);
     }
 
@@ -123,7 +150,7 @@ public:
     bool Execute(const Stmt &stmt){
         char *message = nullptr;
         if(sqlite3_exec(m_Handle, stmt, nullptr, nullptr, &message) != SQLITE_OK){
-            Println("SQLite3: %", message);
+            m_Logger.Log("[SQLite]: %", message);
             sqlite3_free(message);
             return false;
         }
@@ -574,6 +601,27 @@ public:
     }
 };
 
+
+class LogWindow{
+private:
+    DatabaseLogger &m_Logger;
+public:
+    LogWindow(DatabaseLogger &logger):
+        m_Logger(logger)
+    {}
+
+    void Draw(){
+
+        const auto &lines = m_Logger.Lines();
+        ImGui::Begin("Log");
+
+        for(const auto &line: lines)
+            ImGui::Text("%s", line.c_str());
+
+        ImGui::End();
+    }
+};
+
 class Application{
 private:
     AutoWindow m_Window{1280, 720, "Brewery"};
@@ -582,12 +630,15 @@ private:
     float FramerateLimit = 60.f;
 
     Semaphore m_Begin, m_End;
-
-    Database m_DB{"brewery.sqlite"};
+    DatabaseLogger m_Logger;
+    Database m_DB{"brewery.sqlite", m_Logger};
 
     RawVar<Dockspace> m_Dockspace;
+
+    LogWindow m_LogWindow{m_Logger};
     DrinksListPanel m_DrinksList{m_DB};
     OrdersLogPanel m_OrdersLog{m_DB};
+
 public:
     Application(){
         Function<void(const Event&)> handler;
@@ -623,6 +674,7 @@ public:
 
     void OnImGui(){
         m_Dockspace->Draw();
+        m_LogWindow.Draw();
         m_DrinksList.Draw();
         m_OrdersLog.Draw();
         //ImGui::ShowDemoWindow();
