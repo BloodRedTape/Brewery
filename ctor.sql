@@ -54,12 +54,6 @@ CREATE TABLE Goblets(
     Capacity float
 );
 
-CREATE TABLE DrinkOrders(
-    ID int PRIMARY KEY NOT NULL,
-    DrinkID REFERENCES Drinks(ID),
-    GobletID REFERENCES Goblets(ID)
-);
-
 CREATE TABLE OrdersLog(
     ID int PRIMARY KEY NOT NULL,
     CustomerShortName varchar(64),
@@ -67,7 +61,8 @@ CREATE TABLE OrdersLog(
     WaiterID REFERENCES Waiters(ID)
 );
 
-CREATE TABLE OrderDrinks(
+CREATE TABLE DrinkOrders(
     OrderID REFERENCES OrdersLog(ID),
-    DrinkOrderID REFERENCES DrinkOrders(ID)
+    DrinkID REFERENCES Drinks(ID),
+    GobletID REFERENCES Goblets(ID)
 );
