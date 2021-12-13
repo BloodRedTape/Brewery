@@ -164,6 +164,16 @@ public:
 
         return {sqlite_stmt};
     }
+
+    size_t Size(const char *table_name){
+        auto query = Query({"SELECT * FROM %", table_name});
+        size_t counter = 0;
+
+        for(;query; query.Next())
+            counter++;
+
+        return counter;
+    }
 };
 
 class DrinksTableMediator{
@@ -201,6 +211,10 @@ public:
             )
         );
     }
+
+    size_t Size(){
+        return m_Database.Size("Drinks");
+    }
 };
 
 class OrdersLogTableMediator{
@@ -229,6 +243,10 @@ public:
                 waiter_id 
             )
         );
+    }
+
+    size_t Size(){
+        return m_Database.Size("OrdersLog");
     }
 };
 
@@ -283,6 +301,10 @@ public:
     void Clear(){
         m_Database.Execute(Stmt("DELETE FROM Goblets"));
     }
+
+    size_t Size(){
+        return m_Database.Size("Goblets");
+    }
 };
 
 class WaitersTableMediator{
@@ -310,7 +332,7 @@ public:
     }
 
     QueryResult Query(const char *name){
-        return m_Database.Query(Stmt("SELECT * FROM Waiters WHERE Name = '%'", name));
+        return m_Database.Query(Stmt("SELECT * FROM Waiters WHERE ShortName = '%'", name));
     }
 
     QueryResult Query(int id){
@@ -319,6 +341,10 @@ public:
 
     bool Exists(const char *name){
         return Query(name);
+    }
+
+    size_t Size(){
+        return m_Database.Size("Waiters");
     }
 
     void Clear(){
@@ -375,7 +401,7 @@ private:
     float m_Salary = 0.f;
     int m_FullAge = 0;
 
-    int m_LastID = 0;
+    int m_LastID{(int)m_WaitersTable.Size()};
 public:
     NewWaiterWindow(Database &db):
         m_WaitersTable(db)
@@ -463,7 +489,7 @@ private:
     float m_PricePerLiter = 0.f;
     int m_AgeRestriction = 0;
 
-    int m_LastID = 0;
+    int m_LastID{(int)m_DrinksTable.Size()};
 public:
     NewDrinkWindow(Database &db):
         m_DrinksTable(db)
@@ -572,8 +598,7 @@ private:
     int m_CurrentDrinkID = -1;
     int m_CurrentGobletID = -1;
 
-    int m_LastDrinksOrderID = 0;
-    int m_LastOrderLogID = 0;
+    int m_LastOrderLogID{(int)m_OrdersLogTable.Size()};
 public:
     NewOrderWindow(Database &db):
         m_DrinksTable(db),
