@@ -649,6 +649,8 @@ public:
 
     void Run(){
         Clock cl;
+
+        Println("Stacktrace: %\n", Stacktrace());
         
         for(;;){
             float dt = cl.GetElapsedTime().AsSeconds();
