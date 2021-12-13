@@ -465,6 +465,11 @@ public:
         QueryResult query = m_WaitersTable.Query();
 
         if(ImGui::BeginTable("Waiters", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
+            ImGui::TableSetupColumn("Name");
+            ImGui::TableSetupColumn("Salary");
+            ImGui::TableSetupColumn("Age");
+            ImGui::TableHeadersRow();
+
             for( ;query; query.Next()){
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
@@ -553,6 +558,10 @@ public:
         QueryResult query = m_DrinksTable.Query();
 
         if(ImGui::BeginTable("Drinks", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
+            ImGui::TableSetupColumn("Name");
+            ImGui::TableSetupColumn("Price");
+            ImGui::TableSetupColumn("AgeRestr");
+            ImGui::TableHeadersRow();
             for( ;query; query.Next()){
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
