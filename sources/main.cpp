@@ -285,6 +285,35 @@ public:
     }
 };
 
+class WaitersTableMediator{
+private:
+    Database &m_Database;
+public:
+    WaitersTableMediator(Database &db):
+            m_Database(db)
+    {}
+
+    QueryResult Query(){
+        return m_Database.Query(Stmt("SELECT * FROM Waiters"));
+    }
+
+    void Add(int id, const char *name, float salary, int age){
+        m_Database.Execute(
+                Stmt(
+                        "INSERT INTO Waiters(ID, ShortName, Salary, FullAge) VALUES(%, '%', %, %)",
+                        id,
+                        name,
+                        salary,
+                        age
+                )
+        );
+    }
+
+    void Clear(){
+        m_Database.Execute(Stmt("DELETE FROM Waiters"));
+    }
+};
+
 struct AutoWindow: Window{
     AutoWindow(int width, int height, const char *title){
         Open(width, height, title);
@@ -323,6 +352,88 @@ public:
         ImGui::End();
 
         ImGui::PopStyleVar(2);
+    }
+};
+
+class NewWaiterWindow{
+    static constexpr size_t BufferSize = 1024;
+private:
+    WaitersTableMediator m_WaitersTable;
+    InputBuffer<BufferSize> m_WaiterName;
+    float m_Salary = 0.f;
+    int m_FullAge = 0;
+
+    int m_LastID = 0;
+public:
+    NewWaiterWindow(Database &db):
+        m_WaitersTable(db)
+    {}
+
+    void Draw(bool *is_open){
+        if(!*is_open)return;
+
+        ImGui::Begin("New Waiter", is_open);
+        ImGui::InputText("Name", m_WaiterName.Data(), m_WaiterName.Size());
+        ImGui::InputFloat("Salary", &m_Salary);
+        ImGui::InputInt("FullAge", &m_FullAge);
+
+        if(ImGui::Button("Add")){
+            m_WaitersTable.Add(
+                    ++m_LastID,
+                    m_WaiterName.Data(),
+                    m_Salary,
+                    m_FullAge
+            );
+
+            *is_open = false;
+        }
+
+        ImGui::End();
+    }
+};
+
+class WaitersListPanel{
+private:
+    WaitersTableMediator m_WaitersTable;
+    NewWaiterWindow m_NewWaiterWindow;
+    bool m_IsNewWaiterOpen = false;
+public:
+    WaitersListPanel(Database &db):
+            m_WaitersTable(db),
+            m_NewWaiterWindow(db)
+    {}
+
+    void Draw(){
+        m_NewWaiterWindow.Draw(&m_IsNewWaiterOpen);
+
+        ImGui::Begin("Waiters");
+
+        if(ImGui::Button("Clear"))
+            m_WaitersTable.Clear();
+
+
+
+        if(!m_IsNewWaiterOpen && (ImGui::SameLine(), ImGui::Button("New Waiter")))
+            m_IsNewWaiterOpen = true;
+
+        ImGui::Separator();
+
+        QueryResult query = m_WaitersTable.Query();
+
+        if(ImGui::BeginTable("Waiters", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
+            for( ;query; query.Next()){
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", query.GetColumnString(1));
+                ImGui::TableNextColumn();
+                ImGui::Text("%f", query.GetColumnFloat(2));
+                ImGui::TableNextColumn();
+                ImGui::Text("%d", query.GetColumnInt(3));
+            }
+            ImGui::EndTable();
+        }
+
+        ImGui::End();
     }
 };
 
@@ -384,7 +495,7 @@ public:
 
 
 
-        if(!m_IsNewDrinkOpen && (ImGui::SameLine(), ImGui::Button("New")))
+        if(!m_IsNewDrinkOpen && (ImGui::SameLine(), ImGui::Button("New Drink")))
             m_IsNewDrinkOpen = true;
 
         ImGui::Separator();
@@ -645,6 +756,7 @@ private:
     LogWindow m_LogWindow{m_Logger};
     DrinksListPanel m_DrinksList{m_DB};
     OrdersLogPanel m_OrdersLog{m_DB};
+    WaitersListPanel m_WaitersList{m_DB};
 
 public:
     Application(){
@@ -686,6 +798,7 @@ public:
         m_LogWindow.Draw();
         m_DrinksList.Draw();
         m_OrdersLog.Draw();
+        m_WaitersList.Draw();
         //ImGui::ShowDemoWindow();
     }
 
