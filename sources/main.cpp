@@ -326,7 +326,7 @@ public:
     }
 };
 
-class AddDrinkView{
+class NewDrinkWindow{
     static constexpr size_t BufferSize = 1024;
 private:
     DrinksTableMediator m_DrinksTable;
@@ -336,11 +336,14 @@ private:
 
     int m_LastID = 0;
 public:
-    AddDrinkView(Database &db):
+    NewDrinkWindow(Database &db):
         m_DrinksTable(db)
     {}
 
-    void Draw(){
+    void Draw(bool *is_open){
+        if(!*is_open)return;
+
+        ImGui::Begin("New Drink", is_open);
         ImGui::InputText("Name", m_DrinkName.Data(), m_DrinkName.Size());
         ImGui::InputFloat("PricePerLiter", &m_PricePerLiter);
         ImGui::InputInt("AgeRestriction", &m_AgeRestriction);
@@ -352,32 +355,38 @@ public:
                 m_PricePerLiter,
                 m_AgeRestriction
             );
+
+            *is_open = false;
         }
 
-        ImGui::Separator();
-
-        if(ImGui::Button("Clear")){
-            m_DrinksTable.Clear();
-            m_LastID = 0;
-        }
+        ImGui::End();
     }
 };
 
 class DrinksListPanel{
 private:
     DrinksTableMediator m_DrinksTable;
-    AddDrinkView m_AddDrinkPanel;
+    NewDrinkWindow m_NewDrinkWindow;
+    bool m_IsNewDrinkOpen = false;
 public:
     DrinksListPanel(Database &db):
         m_DrinksTable(db),
-        m_AddDrinkPanel(db)
+        m_NewDrinkWindow(db)
     {}
 
     void Draw(){
+        m_NewDrinkWindow.Draw(&m_IsNewDrinkOpen);
+
         ImGui::Begin("Drinks");
 
-        m_AddDrinkPanel.Draw();
-        
+        if(ImGui::Button("Clear"))
+            m_DrinksTable.Clear();
+
+
+
+        if(!m_IsNewDrinkOpen && (ImGui::SameLine(), ImGui::Button("New")))
+            m_IsNewDrinkOpen = true;
+
         ImGui::Separator();
 
         QueryResult query = m_DrinksTable.Query();
