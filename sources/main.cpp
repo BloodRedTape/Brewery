@@ -22,7 +22,7 @@ private:
 
     RawVar<Dockspace> m_Dockspace;
 
-    LogWindow m_LogWindow{m_Logger};
+    ConsoleWindow m_ConsoleWindow{m_Logger, m_DB};
     DrinksListPanel m_DrinksList{m_DB};
     OrdersLogPanel m_OrdersLog{m_DB};
     WaitersListPanel m_WaitersList{m_DB};
@@ -64,7 +64,7 @@ public:
 
     void OnImGui(){
         m_Dockspace->Draw();
-        m_LogWindow.Draw();
+        m_ConsoleWindow.Draw();
         m_DrinksList.Draw();
         m_OrdersLog.Draw();
         m_WaitersList.Draw();

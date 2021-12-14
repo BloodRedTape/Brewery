@@ -1,6 +1,7 @@
 #include <sqlite3.h>
 #include <core/list.hpp>
 #include <core/print.hpp>
+#include <core/function.hpp>
 
 class QueryResult{
 private:
@@ -114,6 +115,17 @@ public:
     bool Execute(const Stmt &stmt){
         char *message = nullptr;
         if(sqlite3_exec(m_Handle, stmt, nullptr, nullptr, &message) != SQLITE_OK){
+            m_Logger.Log("[SQLite]: %", message);
+            sqlite3_free(message);
+            return false;
+        }
+
+        return true;
+    }
+
+    bool Execute(const Stmt &stmt, int (*callback)(void *usr, int, char **, char **), void *usr){
+        char *message = nullptr;
+        if(sqlite3_exec(m_Handle, stmt, callback, usr, &message) != SQLITE_OK){
             m_Logger.Log("[SQLite]: %", message);
             sqlite3_free(message);
             return false;

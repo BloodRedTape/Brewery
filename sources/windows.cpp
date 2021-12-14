@@ -1,4 +1,7 @@
 #include <imgui/backend.hpp>
+#include <core/string.hpp>
+#include <sstream>
+#include <iomanip>
 #include "helpers.cpp"
 #include "mediators.cpp"
 
@@ -223,10 +226,15 @@ public:
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImGui::Text("%s", query.GetColumnString(1));
+
+                if(ImGui::IsItemHovered())
+                    ImGui::SetTooltip(query.GetColumnString(1));
+
                 ImGui::TableNextColumn();
                 ImGui::Text("%f", query.GetColumnFloat(2));
                 ImGui::TableNextColumn();
                 ImGui::Text("%d", query.GetColumnInt(3));
+
             }
             ImGui::EndTable();
         }
@@ -457,21 +465,60 @@ public:
 };
 
 
-class LogWindow{
+class ConsoleWindow{
 private:
     DatabaseLogger &m_Logger;
+    InputBuffer<1024> m_CurrentLine;
+    Database &m_Database;
 public:
-    LogWindow(DatabaseLogger &logger):
-            m_Logger(logger)
+    ConsoleWindow(DatabaseLogger &logger, Database &db):
+            m_Logger(logger),
+            m_Database(db)
     {}
 
     void Draw(){
 
         const auto &lines = m_Logger.Lines();
-        ImGui::Begin("Log");
+        ImGui::Begin("Console");
+
+        const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
+        ImGui::BeginChild("##Text", ImVec2(0, -footer_height_to_reserve));
 
         for(const auto &line: lines)
-            ImGui::Text("%s", line.c_str());
+            ImGui::TextWrapped("%s", line.c_str());
+
+        ImGui::EndChild();
+
+        ImGui::Separator();
+
+        ImGui::PushItemWidth(ImGui::GetWindowWidth());
+
+        if(ImGui::InputText("##Input", m_CurrentLine.Data(), m_CurrentLine.Size(), ImGuiInputTextFlags_EnterReturnsTrue)){
+            m_Logger.Log("[User]: %", m_CurrentLine.Data());
+
+            m_Database.Execute(m_CurrentLine.Data(), [](void *usr, int count, char **data, char **name)->int{
+                ConsoleWindow *self = (ConsoleWindow*)usr;
+
+                std::stringstream string;
+                for(int i = 0; ; i++) {
+                    string << data[i];
+
+                    if(i == count - 1)break;
+
+                    string << std::setw(20);
+                }
+
+                self->m_Logger.Log(string.str().c_str());
+
+                return 0;
+            }, this);
+
+            m_CurrentLine.Clear();
+
+
+            ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
+        }
+        ImGui::PopItemWidth();
 
         ImGui::End();
     }
