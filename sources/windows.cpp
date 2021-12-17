@@ -242,18 +242,31 @@ public:
 
 class NewDrinkPopup{
     static constexpr size_t BufferSize = 1024;
+
+    struct IngredientAddInfo{
+        int ID = 0;
+        float Amount = 0.f;
+    };
 private:
     DrinksTableMediator m_DrinksTable;
+    IngredientsTableMediator m_IngredientsTable;
+    IngredientsDrinksTableMediator m_IngredientsDrinksTable;
     InputBuffer<BufferSize> m_DrinkName;
     float m_PricePerLiter = 0.f;
     int m_AgeRestriction = 0;
 
     int m_LastID{(int)m_DrinksTable.Size()};
 
+    IngredientAddInfo m_CurrentIngredient;
+
+    List<IngredientAddInfo> m_Ingredients;
+
     const char *const m_Name = "New Drink";
 public:
     NewDrinkPopup(Database &db):
-            m_DrinksTable(db)
+            m_DrinksTable(db),
+            m_IngredientsTable(db),
+            m_IngredientsDrinksTable(db)
     {}
 
     void Open(){
@@ -267,13 +280,55 @@ public:
             ImGui::InputFloat("PricePerLiter", &m_PricePerLiter);
             ImGui::InputInt("AgeRestriction", &m_AgeRestriction);
 
-            if (ImGui::Button("Add")) {
+            auto current_ingredient = m_IngredientsTable.Query(m_CurrentIngredient.ID);
+
+            if (ImGui::BeginCombo("##IngredientsCombo",
+                                  current_ingredient ? current_ingredient.GetColumnString(1) : "None")) {
+                auto ingredients_query = m_IngredientsTable.Query();
+                for (; ingredients_query; ingredients_query.Next()) {
+                    int id = ingredients_query.GetColumnInt(0);
+                    const char *name = ingredients_query.GetColumnString(1);
+
+                    if (ImGui::Selectable(name))
+                        m_CurrentIngredient.ID = id;
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::SameLine();
+
+            ImGui::InputFloat("##Amount", &m_CurrentIngredient.Amount);
+
+            ImGui::SameLine();
+
+            if(ImGui::Button("Append") && m_CurrentIngredient.ID && m_CurrentIngredient.Amount > 0.f){
+                m_Ingredients.Add(m_CurrentIngredient);
+                m_CurrentIngredient = {};
+            }
+
+            if(ImGui::BeginTable("##Ingredients", 2)){
+                for(auto info: m_Ingredients){
+                    auto ingredient = m_IngredientsTable.Query(info.ID);
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%s", ingredient.GetColumnString(1));
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.2f", info.Amount);
+                }
+
+                ImGui::EndTable();
+            }
+
+            if (ImGui::Button("Add")
+            && m_Ingredients.Size()) {
                 m_DrinksTable.Add(
                         ++m_LastID,
                         m_DrinkName.Data(),
                         m_PricePerLiter,
                         m_AgeRestriction
                 );
+                for(auto info: m_Ingredients)
+                    m_IngredientsDrinksTable.Add(info.ID, info.Amount, m_LastID);
                 ImGui::CloseCurrentPopup();
             }
             
@@ -284,6 +339,8 @@ public:
 
             ImGui::EndPopup();
         }else{
+            m_Ingredients.Clear();
+            m_CurrentIngredient = {};
             m_DrinkName.Clear();
             m_PricePerLiter = 0.f;
             m_AgeRestriction = 0;
@@ -461,7 +518,7 @@ public:
             ImGui::PopItemWidth();
 
             if (m_Drinks.Size()
-                && ImGui::BeginTable("Drinks", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)) {
+                && ImGui::BeginTable("Drinks", 3)) {
                 for (const auto &drink: m_Drinks) {
                     auto drink_query = m_DrinksTable.Query(drink.DrinkID);
                     auto goblet_query = m_GobletsTable.Query(drink.GobletID);
