@@ -207,6 +207,10 @@ public:
     void Clear(){
         m_Database.Execute(Stmt("DELETE FROM Ingredients"));
     }
+
+    size_t Size(){
+        return m_Database.Size("Ingredients");
+    }
 };
 
 

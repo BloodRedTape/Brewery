@@ -26,6 +26,7 @@ private:
     DrinksListPanel m_DrinksList{m_DB};
     OrdersLogPanel m_OrdersLog{m_DB};
     WaitersListPanel m_WaitersList{m_DB};
+    IngredientsListPanel m_IngredientsList{m_DB};
 
 public:
     Application(){
@@ -68,6 +69,7 @@ public:
         m_DrinksList.Draw();
         m_OrdersLog.Draw();
         m_WaitersList.Draw();
+        m_IngredientsList.Draw();
         //ImGui::ShowDemoWindow();
     }
 

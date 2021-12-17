@@ -18,12 +18,6 @@ CREATE TABLE Ingredients(
     SourceID REFERENCES Sources(ID)
 );
 
-CREATE TABLE IngredientStorages(
-    Name varchar(256) PRIMARY KEY NOT NULL,
-    IngredientID REFERENCES Ingredients(ID),
-    UnitsCount float
-);
-
 CREATE TABLE Drinks(
     ID int PRIMARY KEY NOT NULL,
     Name varchar(64),

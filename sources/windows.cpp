@@ -35,6 +35,109 @@ public:
     }
 };
 
+class NewIngredientPopup{
+    static constexpr size_t BufferSize = 1024;
+private:
+    IngredientsTableMediator m_IngredientsTable;
+    InputBuffer<BufferSize> m_IngredientName;
+    InputBuffer<BufferSize> m_UnitsName;
+
+    int m_LastID{(int)m_IngredientsTable.Size()};
+
+    const char *const m_Name = "New Drink";
+public:
+    NewIngredientPopup(Database &db):
+            m_IngredientsTable(db)
+    {}
+
+    void Open(){
+        ImGui::OpenPopup(m_Name);
+    }
+
+    void Draw(){
+
+        if(ImGui::BeginPopup(m_Name)) {
+            ImGui::InputText("Name", m_IngredientName.Data(), m_IngredientName.Size());
+            ImGui::InputText("Units", m_UnitsName.Data(), m_UnitsName.Size());
+
+            if (ImGui::Button("Add")) {
+                m_IngredientsTable.Add(
+                        ++m_LastID,
+                        m_IngredientName.Data(),
+                        m_UnitsName.Data(),
+                        228
+                );
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::SameLine();
+
+            if(ImGui::Button("Cancel"))
+                ImGui::CloseCurrentPopup();
+
+            ImGui::EndPopup();
+        }else{
+            m_IngredientName.Clear();
+            m_UnitsName.Clear();
+        }
+    }
+};
+
+class IngredientsListPanel{
+private:
+    IngredientsTableMediator m_IngredientsTable;
+    IngredientsDrinksTableMediator m_IngredientsDrinksTable;
+    NewIngredientPopup m_NewIngredientPopup;
+public:
+    IngredientsListPanel(Database &db):
+            m_NewIngredientPopup(db),
+            m_IngredientsTable(db),
+            m_IngredientsDrinksTable(db)
+    {}
+
+    void Draw(){
+
+        ImGui::Begin("Ingredients");
+
+        if(ImGui::Button("Clear"))
+            m_IngredientsTable.Clear();
+
+        ImGui::SameLine();
+
+        if(ImGui::Button("New Ingredient"))
+            m_NewIngredientPopup.Open();
+        m_NewIngredientPopup.Draw();
+
+        ImGui::Separator();
+
+        ImGui::BeginChild("##List");
+
+        QueryResult query = m_IngredientsTable.Query();
+
+        if(ImGui::BeginTable("Ingredients", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
+            ImGui::TableSetupColumn("Name");
+            ImGui::TableSetupColumn("Units");
+            ImGui::TableSetupColumn("Source");
+            ImGui::TableHeadersRow();
+            for( ;query; query.Next()){
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", query.GetColumnString(1));
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", query.GetColumnString(2));
+                ImGui::TableNextColumn();
+                ImGui::Text("%d", query.GetColumnInt(3));
+
+            }
+            ImGui::EndTable();
+        }
+        ImGui::EndChild();
+        ImGui::End();
+
+    }
+};
+
+
 class NewWaiterPopup{
     static constexpr size_t BufferSize = 1024;
 private:
