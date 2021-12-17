@@ -39,15 +39,19 @@ class NewIngredientPopup{
     static constexpr size_t BufferSize = 1024;
 private:
     IngredientsTableMediator m_IngredientsTable;
+    SourcesTableMediator m_SourcesTable;
     InputBuffer<BufferSize> m_IngredientName;
     InputBuffer<BufferSize> m_UnitsName;
+
+    int m_SourceID = 0;
 
     int m_LastID{(int)m_IngredientsTable.Size()};
 
     const char *const m_Name = "New Ingredient";
 public:
     NewIngredientPopup(Database &db):
-            m_IngredientsTable(db)
+            m_IngredientsTable(db),
+            m_SourcesTable(db)
     {}
 
     void Open(){
@@ -60,12 +64,27 @@ public:
             ImGui::InputText("Name", m_IngredientName.Data(), m_IngredientName.Size());
             ImGui::InputText("Units", m_UnitsName.Data(), m_UnitsName.Size());
 
-            if (ImGui::Button("Add")) {
+            auto current_source = m_SourcesTable.Query(m_SourceID);
+
+            if (ImGui::BeginCombo("##IngredientsCombo",
+                                  current_source ? current_source.GetColumnString(1) : "None")) {
+                auto sources_query = m_SourcesTable.Query();
+                for (; sources_query; sources_query.Next()) {
+                    int id = sources_query.GetColumnInt(0);
+                    const char *name = sources_query.GetColumnString(1);
+
+                    if (ImGui::Selectable(name))
+                        m_SourceID = id;
+                }
+                ImGui::EndCombo();
+            }
+
+            if (ImGui::Button("Add") && IsDataValid()) {
                 m_IngredientsTable.Add(
                         ++m_LastID,
                         m_IngredientName.Data(),
                         m_UnitsName.Data(),
-                        228
+                        m_SourceID
                 );
                 ImGui::CloseCurrentPopup();
             }
@@ -79,20 +98,26 @@ public:
         }else{
             m_IngredientName.Clear();
             m_UnitsName.Clear();
+            m_SourceID = 0;
         }
+    }
+
+private:
+    bool IsDataValid()const{
+        return m_SourceID && m_IngredientName.Length() && m_UnitsName.Length();
     }
 };
 
 class IngredientsListPanel{
 private:
     IngredientsTableMediator m_IngredientsTable;
-    IngredientsDrinksTableMediator m_IngredientsDrinksTable;
+    SourcesTableMediator m_SourcesTable;
     NewIngredientPopup m_NewIngredientPopup;
 public:
     IngredientsListPanel(Database &db):
             m_NewIngredientPopup(db),
             m_IngredientsTable(db),
-            m_IngredientsDrinksTable(db)
+            m_SourcesTable(db)
     {}
 
     void Draw(){
@@ -126,7 +151,8 @@ public:
                 ImGui::TableNextColumn();
                 ImGui::Text("%s", query.GetColumnString(2));
                 ImGui::TableNextColumn();
-                ImGui::Text("%d", query.GetColumnInt(3));
+                auto source = m_SourcesTable.Query(query.GetColumnInt(3));
+                ImGui::Text("%s", source.GetColumnString(1));
 
             }
             ImGui::EndTable();
@@ -302,7 +328,7 @@ public:
     }
 private:
     bool IsDataValid()const{
-        return m_SourceName.Size() && m_House.Size() && m_PostalCode && m_City.Size();
+        return m_SourceName.Length() && m_House.Length() && m_PostalCode && m_City.Length();
     }
 };
 
