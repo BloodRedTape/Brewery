@@ -44,9 +44,7 @@ private:
     InputBuffer<BufferSize> m_UnitsName;
 
     int m_SourceID = 0;
-
-    int m_LastID{(int)m_IngredientsTable.Size()};
-
+    
     const char *const m_Name = "New Ingredient";
 public:
     NewIngredientPopup(Database &db):
@@ -81,7 +79,6 @@ public:
 
             if (ImGui::Button("Add") && IsDataValid()) {
                 m_IngredientsTable.Add(
-                        ++m_LastID,
                         m_IngredientName.Data(),
                         m_UnitsName.Data(),
                         m_SourceID
@@ -172,8 +169,6 @@ private:
     float m_Salary = 0.f;
     int m_FullAge = 0;
 
-    int m_LastID{(int)m_WaitersTable.Size()};
-
     const char *const m_Name = "New Waiter";
 public:
     NewWaiterPopup(Database &db):
@@ -192,7 +187,6 @@ public:
 
             if (ImGui::Button("Add")) {
                 m_WaitersTable.Add(
-                        ++m_LastID,
                         m_WaiterName.Data(),
                         m_Salary,
                         m_FullAge
@@ -276,9 +270,6 @@ private:
     InputBuffer<BufferSize> m_House;
     int m_PostalCode = 0;
 
-    int m_LastSourceID{(int)m_SourcesTable.Size()};
-    int m_LastAddressID{(int)m_AddressesTable.Size()};
-
     const char *const m_Name = "New Source";
 
 public:
@@ -299,8 +290,7 @@ public:
             ImGui::InputInt("PostalCode", &m_PostalCode);
 
             if (ImGui::Button("Add") && IsDataValid()) {
-                m_AddressesTable.TryAdd(
-                        ++m_LastAddressID,
+                (void)m_AddressesTable.TryAdd(
                         m_City.Data(),
                         m_House.Data(),
                         m_PostalCode
@@ -308,7 +298,7 @@ public:
 
                 auto address = m_AddressesTable.Query(m_City.Data(), m_House.Data(), m_PostalCode);
 
-                m_SourcesTable.Add(++m_LastSourceID, m_SourceName.Data(), address.GetColumnInt(0));
+                m_SourcesTable.Add(m_SourceName.Data(), address.GetColumnInt(0));
 
                 ImGui::CloseCurrentPopup();
             }
@@ -607,8 +597,6 @@ private:
     int m_CurrentDrinkID = -1;
     int m_CurrentGobletID = -1;
 
-    int m_LastOrderLogID{(int)m_OrdersLogTable.Size()};
-
     const char *const m_Name = "New Order";
 public:
     NewOrderPopup(Database &db):
@@ -689,14 +677,13 @@ public:
             }
 
             if (ImGui::Button("Place Order") && IsDataValid() && m_WaitersTable.Exists(m_WaiterName.Data())) {
-                m_LastOrderLogID++;
 
                 QueryResult waiter = m_WaitersTable.Query(m_WaiterName.Data());
 
-                m_OrdersLogTable.Add(m_LastOrderLogID, m_CustomerName.Data(), m_Tips, waiter.GetColumnInt(0));
+                int id = m_OrdersLogTable.Add(m_CustomerName.Data(), m_Tips, waiter.GetColumnInt(0));
 
                 for (auto drink: m_Drinks) {
-                    m_DrinksOrdersTable.Add(m_LastOrderLogID, drink.DrinkID, drink.GobletID);
+                    m_DrinksOrdersTable.Add(id, drink.DrinkID, drink.GobletID);
                 }
                 ImGui::CloseCurrentPopup();
             }

@@ -44,6 +44,7 @@ public:
 class OrdersLogTableMediator{
 private:
     Database &m_Database;
+    int m_LastID{(int)m_Database.Size("OrdersLog")};
 public:
     OrdersLogTableMediator(Database &db):
             m_Database(db)
@@ -57,16 +58,18 @@ public:
         m_Database.Execute(Stmt("DELETE FROM OrdersLog"));
     }
 
-    void Add(int id, const char *customer_name, float tips, int waiter_id){
+    int Add(const char *customer_name, float tips, int waiter_id){
+        ++m_LastID;
         m_Database.Execute(
                 Stmt(
                         "INSERT INTO OrdersLog(ID, CustomerShortName, Tips, WaiterID) VALUES(%,'%',%,%)",
-                        id,
+                        m_LastID,
                         customer_name,
                         tips,
                         waiter_id
                 )
         );
+        return m_LastID;
     }
 
     size_t Size(){
@@ -134,6 +137,7 @@ public:
 class WaitersTableMediator{
 private:
     Database &m_Database;
+    int m_LastID{(int)m_Database.Size("Waiters")};
 public:
     WaitersTableMediator(Database &db):
             m_Database(db)
@@ -143,16 +147,18 @@ public:
         return m_Database.Query(Stmt("SELECT * FROM Waiters"));
     }
 
-    void Add(int id, const char *name, float salary, int age){
+    int Add(const char *name, float salary, int age){
+        ++m_LastID;
         m_Database.Execute(
                 Stmt(
                         "INSERT INTO Waiters(ID, ShortName, Salary, FullAge) VALUES(%, '%', %, %)",
-                        id,
+                        m_LastID,
                         name,
                         salary,
                         age
                 )
         );
+        return m_LastID;
     }
 
     QueryResult Query(const char *name){
@@ -179,6 +185,7 @@ public:
 class IngredientsTableMediator{
 private:
     Database &m_Database;
+    int m_LastID{(int)m_Database.Size("Ingredients")};
 public:
     IngredientsTableMediator(Database &db):
             m_Database(db)
@@ -188,16 +195,18 @@ public:
         return m_Database.Query(Stmt("SELECT * FROM Ingredients"));
     }
 
-    void Add(int id, const char *name, const char *units, int source_id){
+    int Add(const char *name, const char *units, int source_id){
+        ++m_LastID;
         m_Database.Execute(
                 Stmt(
                     "INSERT INTO Ingredients(ID, Name, Units, SourceID) VALUES(%, '%', '%', %)",
-                    id,
+                    m_LastID,
                     name,
                     units,
                     source_id
                 )
         );
+        return m_LastID;
     }
 
     QueryResult Query(int id){
@@ -250,6 +259,7 @@ public:
 class SourcesTableMediator{
 private:
     Database &m_Database;
+    int m_LastID{(int)m_Database.Size("Sources")};
 public:
     SourcesTableMediator(Database &db):
             m_Database(db)
@@ -259,15 +269,17 @@ public:
         return m_Database.Query(Stmt("SELECT * FROM Sources"));
     }
 
-    void Add(int id, const char *name, int address_id){
+    int Add(const char *name, int address_id){
+        ++m_LastID;
         m_Database.Execute(
                 Stmt(
                         "INSERT INTO Sources(ID, Name, AddressID) VALUES(%, '%', %)",
-                        id,
+                        m_LastID,
                         name,
                         address_id
                 )
         );
+        return m_LastID;
     }
 
     QueryResult Query(int id){
@@ -286,6 +298,7 @@ public:
 class AddressesTableMediator{
 private:
     Database &m_Database;
+    int m_LastID{(int)m_Database.Size("Addresses")};
 public:
     AddressesTableMediator(Database &db):
             m_Database(db)
@@ -295,18 +308,21 @@ public:
         return m_Database.Query(Stmt("SELECT * FROM Addresses"));
     }
 
-    void TryAdd(int id, const char *city, const char *house, int postal_code){
-        if(Query(city, house, postal_code))return;
+    int TryAdd(const char *city, const char *house, int postal_code){
+        if(Query(city, house, postal_code))return 0;
 
+        ++m_LastID;
         m_Database.Execute(
                 Stmt(
                         "INSERT INTO Addresses(ID, City, House, PostalCode) VALUES(%, '%', '%', %)",
-                        id,
+                        m_LastID,
                         city,
                         house,
                         postal_code
                 )
         );
+
+        return m_LastID;
     }
 
     QueryResult Query(const char *city, const char *house, int postal_code){
