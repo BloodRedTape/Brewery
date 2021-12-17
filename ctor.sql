@@ -12,20 +12,15 @@ CREATE TABLE Sources(
 );
 
 CREATE TABLE Ingredients(
-    Name varchar(64) PRIMARY KEY NOT NULL,
+    ID int PRIMARY KEY NOT NULL,
+    Name varchar(64) NOT NULL,
     Units varchar(64) NOT NULL,
     SourceID REFERENCES Sources(ID)
 );
 
 CREATE TABLE IngredientStorages(
     Name varchar(256) PRIMARY KEY NOT NULL,
-    IngredientName REFERENCES Ingredients(Name),
-    UnitsCount float
-);
-
-CREATE TABLE IngredientPortions(
-    ID int PRIMARY KEY,
-    IngredientName REFERENCES Ingredients(Name),
+    IngredientID REFERENCES Ingredients(ID),
     UnitsCount float
 );
 
@@ -37,7 +32,8 @@ CREATE TABLE Drinks(
 );
 
 CREATE TABLE IngredientsDrinks(
-    IngredientPortionID int REFERENCES IngredientPortions(ID),
+    IngredientID REFERENCES Ingredients(ID),
+    UnitsCount float,
     DrinkID REFERENCES Drinks(ID)
 );
 

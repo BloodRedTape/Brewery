@@ -191,11 +191,15 @@ public:
 class DrinksListPanel{
 private:
     DrinksTableMediator m_DrinksTable;
+    IngredientsTableMediator m_IngredientsTable;
+    IngredientsDrinksTableMediator m_IngredientsDrinksTable;
     NewDrinkPopup m_NewDrinkPopup;
 public:
     DrinksListPanel(Database &db):
-            m_DrinksTable(db),
-            m_NewDrinkPopup(db)
+        m_DrinksTable(db),
+        m_NewDrinkPopup(db),
+        m_IngredientsTable(db),
+        m_IngredientsDrinksTable(db)
     {}
 
     void Draw(){
@@ -227,8 +231,26 @@ public:
                 ImGui::TableNextColumn();
                 ImGui::Text("%s", query.GetColumnString(1));
 
-                if(ImGui::IsItemHovered())
-                    ImGui::SetTooltip(query.GetColumnString(1));
+                if(ImGui::IsItemHovered()) {
+                    int drink_id = query.GetColumnInt(0);
+
+                    //Yes, it is fucking horrible, i know
+                    std::stringstream tooltip;
+
+                    QueryResult ingredients_of_drink = m_IngredientsDrinksTable.Query(drink_id);
+
+
+                    for(; ingredients_of_drink; ingredients_of_drink.Next()){
+                        int ingredient_id = ingredients_of_drink.GetColumnInt(0);
+                        float units = ingredients_of_drink.GetColumnFloat(1);
+
+                        QueryResult ingredient = m_IngredientsTable.Query(ingredient_id);
+
+                        tooltip << ingredient.GetColumnString(1) << ' ' << units << ' ' << ingredient.GetColumnString(2) << '\n';
+                    }
+
+                    ImGui::SetTooltip(tooltip.str().c_str());
+                }
 
                 ImGui::TableNextColumn();
                 ImGui::Text("%f", query.GetColumnFloat(2));

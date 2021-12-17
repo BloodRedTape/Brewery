@@ -175,3 +175,70 @@ public:
         m_Database.Execute(Stmt("DELETE FROM Waiters"));
     }
 };
+
+class IngredientsTableMediator{
+private:
+    Database &m_Database;
+public:
+    IngredientsTableMediator(Database &db):
+            m_Database(db)
+    {}
+
+    QueryResult Query(){
+        return m_Database.Query(Stmt("SELECT * FROM Ingredients"));
+    }
+
+    void Add(int id, const char *name, const char *units, int source_id){
+        m_Database.Execute(
+                Stmt(
+                    "INSERT INTO Ingredients(ID, Name, Units, SourceID) VALUES(%, '%', '%', %)",
+                    id,
+                    name,
+                    units,
+                    source_id
+                )
+        );
+    }
+
+    QueryResult Query(int id){
+        return m_Database.Query(Stmt("SELECT * FROM Ingredients WHERE ID = %", id));
+    }
+
+    void Clear(){
+        m_Database.Execute(Stmt("DELETE FROM Ingredients"));
+    }
+};
+
+
+
+class IngredientsDrinksTableMediator{
+private:
+    Database &m_Database;
+public:
+    IngredientsDrinksTableMediator(Database &db):
+            m_Database(db)
+    {}
+
+    QueryResult Query(){
+        return m_Database.Query(Stmt("SELECT * FROM IngredientsDrinks"));
+    }
+
+    void Add(int ingredient_id, float units, int drink_id){
+        m_Database.Execute(
+                Stmt(
+                        "INSERT INTO IngredientsDrinks(IngredientID, UnitsCount, DrinkID) VALUES(%, %, %)",
+                        ingredient_id,
+                        units,
+                        drink_id
+                )
+        );
+    }
+
+    QueryResult Query(int drink_id){
+        return m_Database.Query(Stmt("SELECT * FROM IngredientsDrinks WHERE DrinkID = %", drink_id));
+    }
+
+    void Clear(){
+        m_Database.Execute(Stmt("DELETE FROM IngredientsDrinks"));
+    }
+};
