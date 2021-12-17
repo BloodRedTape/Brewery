@@ -246,3 +246,83 @@ public:
         m_Database.Execute(Stmt("DELETE FROM IngredientsDrinks"));
     }
 };
+
+class SourcesTableMediator{
+private:
+    Database &m_Database;
+public:
+    SourcesTableMediator(Database &db):
+            m_Database(db)
+    {}
+
+    QueryResult Query(){
+        return m_Database.Query(Stmt("SELECT * FROM Sources"));
+    }
+
+    void Add(int id, const char *name, int address_id){
+        m_Database.Execute(
+                Stmt(
+                        "INSERT INTO Sources(ID, Name, AddressID) VALUES(%, '%', %)",
+                        id,
+                        name,
+                        address_id
+                )
+        );
+    }
+
+    QueryResult Query(int id){
+        return m_Database.Query(Stmt("SELECT * FROM Sources WHERE ID = %", id));
+    }
+
+    void Clear(){
+        m_Database.Execute(Stmt("DELETE FROM Sources"));
+    }
+
+    size_t Size()const{
+        return m_Database.Size("Sources");
+    }
+};
+
+class AddressesTableMediator{
+private:
+    Database &m_Database;
+public:
+    AddressesTableMediator(Database &db):
+            m_Database(db)
+    {}
+
+    QueryResult Query(){
+        return m_Database.Query(Stmt("SELECT * FROM Addresses"));
+    }
+
+    void TryAdd(int id, const char *city, const char *house, int postal_code){
+        if(Query(city, house, postal_code))return;
+
+        m_Database.Execute(
+                Stmt(
+                        "INSERT INTO Addresses(ID, City, House, PostalCode) VALUES(%, '%', '%', %)",
+                        id,
+                        city,
+                        house,
+                        postal_code
+                )
+        );
+    }
+
+    QueryResult Query(const char *city, const char *house, int postal_code){
+        return m_Database.Query(Stmt("SELECT * FROM Addresses WHERE City = '%' AND House = '%' AND PostalCode = %", city, house, postal_code));
+    }
+
+    QueryResult Query(int id){
+        return m_Database.Query(Stmt("SELECT * FROM Addresses WHERE ID = %", id));
+    }
+
+
+    void Clear(){
+        m_Database.Execute(Stmt("DELETE FROM Addresses"));
+    }
+
+    size_t Size()const{
+        return m_Database.Size("Addresses");
+    }
+};

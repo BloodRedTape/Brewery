@@ -44,7 +44,7 @@ private:
 
     int m_LastID{(int)m_IngredientsTable.Size()};
 
-    const char *const m_Name = "New Drink";
+    const char *const m_Name = "New Ingredient";
 public:
     NewIngredientPopup(Database &db):
             m_IngredientsTable(db)
@@ -239,6 +239,132 @@ public:
         ImGui::End();
     }
 };
+
+class NewSourcePopup{
+    static constexpr size_t BufferSize = 1024;
+private:
+    SourcesTableMediator m_SourcesTable;
+    AddressesTableMediator m_AddressesTable;
+    InputBuffer<BufferSize> m_SourceName;
+    InputBuffer<BufferSize> m_City;
+    InputBuffer<BufferSize> m_House;
+    int m_PostalCode = 0;
+
+    int m_LastSourceID{(int)m_SourcesTable.Size()};
+    int m_LastAddressID{(int)m_AddressesTable.Size()};
+
+    const char *const m_Name = "New Source";
+
+public:
+    NewSourcePopup(Database &db):
+            m_SourcesTable(db),
+            m_AddressesTable(db)
+    {}
+
+    void Open(){
+        ImGui::OpenPopup(m_Name);
+    }
+
+    void Draw(){
+        if(ImGui::BeginPopup(m_Name)) {
+            ImGui::InputText("Source Name", m_SourceName.Data(), m_SourceName.Size());
+            ImGui::InputText("City", m_City.Data(), m_City.Size());
+            ImGui::InputText("House", m_House.Data(), m_House.Size());
+            ImGui::InputInt("PostalCode", &m_PostalCode);
+
+            if (ImGui::Button("Add") && IsDataValid()) {
+                m_AddressesTable.TryAdd(
+                        ++m_LastAddressID,
+                        m_City.Data(),
+                        m_House.Data(),
+                        m_PostalCode
+                );
+
+                auto address = m_AddressesTable.Query(m_City.Data(), m_House.Data(), m_PostalCode);
+
+                m_SourcesTable.Add(++m_LastSourceID, m_SourceName.Data(), address.GetColumnInt(0));
+
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Cancel"))
+                ImGui::CloseCurrentPopup();
+
+            ImGui::EndPopup();
+        }else{
+            m_House.Clear();
+            m_City.Clear();
+            m_SourceName.Clear();
+            m_PostalCode = 0;
+        }
+    }
+private:
+    bool IsDataValid()const{
+        return m_SourceName.Size() && m_House.Size() && m_PostalCode && m_City.Size();
+    }
+};
+
+class SourcesListPanel{
+private:
+    SourcesTableMediator m_SourcesTable;
+    AddressesTableMediator m_AddressesTable;
+    NewSourcePopup m_NewSourcePopup;
+public:
+    SourcesListPanel(Database &db):
+            m_SourcesTable(db),
+            m_AddressesTable(db),
+            m_NewSourcePopup(db)
+    {}
+
+    void Draw(){
+
+        ImGui::Begin("Sources");
+
+        if(ImGui::Button("Clear"))
+            m_SourcesTable.Clear();
+
+        ImGui::SameLine();
+
+        if(ImGui::Button("New Source"))
+            m_NewSourcePopup.Open();
+        m_NewSourcePopup.Draw();
+
+        ImGui::Separator();
+
+        ImGui::BeginChild("##List");
+
+
+        if(ImGui::BeginTable("Sources", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
+            ImGui::TableSetupColumn("Name");
+            ImGui::TableSetupColumn("City");
+            ImGui::TableSetupColumn("House");
+            ImGui::TableSetupColumn("PostalCode");
+            ImGui::TableHeadersRow();
+
+            QueryResult query = m_SourcesTable.Query();
+            for( ;query; query.Next()){
+
+                auto address = m_AddressesTable.Query(query.GetColumnInt(2));
+
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", query.GetColumnString(1));
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", address.GetColumnString(1));
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", query.GetColumnString(2));
+                ImGui::TableNextColumn();
+                ImGui::Text("%d", query.GetColumnInt(3));
+            }
+            ImGui::EndTable();
+        }
+        ImGui::EndChild();
+        ImGui::End();
+    }
+};
+
 
 class NewDrinkPopup{
     static constexpr size_t BufferSize = 1024;
@@ -652,10 +778,13 @@ private:
     DatabaseLogger &m_Logger;
     InputBuffer<1024> m_CurrentLine;
     Database &m_Database;
+    List<std::string> m_History;
+    size_t m_HistoryIndex = 0;
 public:
     ConsoleWindow(DatabaseLogger &logger, Database &db):
             m_Logger(logger),
-            m_Database(db)
+            m_Database(db),
+            m_History{""}
     {}
 
     void Draw(){
