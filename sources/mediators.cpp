@@ -41,6 +41,48 @@ public:
     }
 };
 
+class GobletsTableMediator{
+private:
+    Database &m_Database;
+    int m_LastID{(int)m_Database.Size("Goblets")};
+public:
+    GobletsTableMediator(Database &db):
+            m_Database(db)
+    {}
+
+    QueryResult Query(){
+        return m_Database.Query(Stmt("SELECT * FROM Goblets"));
+    }
+
+    QueryResult Query(int id){
+        return m_Database.Query(Stmt("SELECT * FROM Goblets WHERE ID = %", id));
+    }
+
+    QueryResult Query(const char *name){
+        return m_Database.Query(Stmt("SELECT * FROM Goblets WHERE Name = %", name));
+    }
+
+    void Clear(){
+        m_LastID = 0;
+        m_Database.Execute(Stmt("DELETE FROM Goblets"));
+    }
+
+    void Add(const char *name, float capacity){
+        m_Database.Execute(
+                Stmt(
+                        "INSERT INTO Goblets(ID, Name, Capacity) VALUES(%, '%', %)",
+                        ++m_LastID,
+                        name,
+                        capacity
+                )
+        );
+    }
+
+    size_t Size(){
+        return m_Database.Size("Goblets");
+    }
+};
+
 class OrdersLogTableMediator{
 private:
     Database &m_Database;
@@ -55,6 +97,7 @@ public:
     }
 
     void Clear(){
+        m_LastID = 0;
         m_Database.Execute(Stmt("DELETE FROM OrdersLog"));
     }
 
@@ -105,35 +148,6 @@ public:
     }
 };
 
-class GobletsTableMediator{
-private:
-    Database &m_Database;
-public:
-    GobletsTableMediator(Database &db):
-            m_Database(db)
-    {}
-
-    QueryResult Query(){
-        return m_Database.Query(Stmt("SELECT * FROM Goblets"));
-    }
-
-    QueryResult Query(int id){
-        return m_Database.Query(Stmt("SELECT * FROM Goblets WHERE ID = %", id));
-    }
-
-    QueryResult Query(const char *name){
-        return m_Database.Query(Stmt("SELECT * FROM Goblets WHERE Name = %", name));
-    }
-
-    void Clear(){
-        m_Database.Execute(Stmt("DELETE FROM Goblets"));
-    }
-
-    size_t Size(){
-        return m_Database.Size("Goblets");
-    }
-};
-
 class WaitersTableMediator{
 private:
     Database &m_Database;
@@ -178,6 +192,7 @@ public:
     }
 
     void Clear(){
+        m_LastID = 0;
         m_Database.Execute(Stmt("DELETE FROM Waiters"));
     }
 };
@@ -218,6 +233,7 @@ public:
     }
 
     size_t Size(){
+        m_LastID = 0;
         return m_Database.Size("Ingredients");
     }
 };
@@ -287,6 +303,7 @@ public:
     }
 
     void Clear(){
+        m_LastID = 0;
         m_Database.Execute(Stmt("DELETE FROM Sources"));
     }
 
@@ -335,6 +352,7 @@ public:
 
 
     void Clear(){
+        m_LastID = 0;
         m_Database.Execute(Stmt("DELETE FROM Addresses"));
     }
 

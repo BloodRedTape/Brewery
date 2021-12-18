@@ -28,6 +28,7 @@ private:
     WaitersListPanel m_WaitersList{m_DB};
     IngredientsListPanel m_IngredientsList{m_DB};
     SourcesListPanel m_SourcesList{m_DB};
+    GobletsListPanel m_GobletsList{m_DB};
 
 public:
     Application(){
@@ -72,6 +73,7 @@ public:
         m_WaitersList.Draw();
         m_IngredientsList.Draw();
         m_SourcesList.Draw();
+        m_GobletsList.Draw();
         //ImGui::ShowDemoWindow();
     }
 

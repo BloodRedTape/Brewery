@@ -260,6 +260,103 @@ public:
     }
 };
 
+class NewGobletPopup{
+    static constexpr size_t BufferSize = 1024;
+private:
+    GobletsTableMediator m_GobletsTable;
+    InputBuffer<BufferSize> m_GobletName;
+    float m_Capacity = 0.f;
+
+    const char *const m_Name = "New Goblet";
+public:
+    NewGobletPopup(Database &db):
+            m_GobletsTable(db)
+    {}
+
+    void Open(){
+        ImGui::OpenPopup(m_Name);
+    }
+
+    void Draw(){
+        if(ImGui::BeginPopup(m_Name)) {
+            ImGui::InputText("Name", m_GobletName.Data(), m_GobletName.Size());
+            ImGui::InputFloat("Capacity", &m_Capacity);
+
+            if (ImGui::Button("Add") && IsDataValid()) {
+                m_GobletsTable.Add(
+                        m_GobletName.Data(),
+                        m_Capacity
+                );
+
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Cancel"))
+                ImGui::CloseCurrentPopup();
+
+            ImGui::EndPopup();
+        }else{
+            m_GobletName.Clear();
+            m_Capacity = 0.f;
+        }
+    }
+private:
+    bool IsDataValid()const{
+        return m_GobletName.Length() && m_Capacity > 0.f;
+    }
+};
+
+class GobletsListPanel{
+private:
+    GobletsTableMediator m_GobletsTable;
+    NewGobletPopup m_NewGobletPopup;
+public:
+    GobletsListPanel(Database &db):
+            m_GobletsTable(db),
+            m_NewGobletPopup(db)
+    {}
+
+    void Draw(){
+
+        ImGui::Begin("Goblets");
+
+        if(ImGui::Button("Clear"))
+            m_GobletsTable.Clear();
+
+        ImGui::SameLine();
+
+        if(ImGui::Button("New Goblet"))
+            m_NewGobletPopup.Open();
+        m_NewGobletPopup.Draw();
+
+        ImGui::Separator();
+
+        ImGui::BeginChild("##List");
+
+        QueryResult query = m_GobletsTable.Query();
+
+        if(ImGui::BeginTable("Goblets", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
+            ImGui::TableSetupColumn("Name");
+            ImGui::TableSetupColumn("Capacity");
+            ImGui::TableHeadersRow();
+
+            for( ;query; query.Next()){
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", query.GetColumnString(1));
+                ImGui::TableNextColumn();
+                ImGui::Text("%f", query.GetColumnFloat(2));
+            }
+            ImGui::EndTable();
+        }
+        ImGui::EndChild();
+        ImGui::End();
+    }
+};
+
+
 class NewSourcePopup{
     static constexpr size_t BufferSize = 1024;
 private:
