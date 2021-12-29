@@ -375,7 +375,7 @@ public:
     QueryResult GetExpensiveWaiters(float salary_limit){
         return m_Database.Query(Stmt("SELECT * FROM Waiters WHERE Salary > %", salary_limit));
     }
-    
+
     QueryResult GetDrinksWith(const char *ingredient_name){
         return m_Database.Query(Stmt("SELECT * FROM Drinks WHERE Drinks.ID IN"
                                      "(SELECT DrinkID FROM IngredientsDrinks WHERE IngredientID IN"
