@@ -917,22 +917,7 @@ public:
         if(ImGui::InputText("##Input", m_CurrentLine.Data(), m_CurrentLine.Size(), ImGuiInputTextFlags_EnterReturnsTrue)){
             m_Logger.Log("[User]: %", m_CurrentLine.Data());
 
-            m_Database.Execute(m_CurrentLine.Data(), [](void *usr, int count, char **data, char **name)->int{
-                ConsoleWindow *self = (ConsoleWindow*)usr;
-
-                std::stringstream string;
-                for(int i = 0; ; i++) {
-                    string << data[i];
-
-                    if(i == count - 1)break;
-
-                    string << std::setw(20);
-                }
-
-                self->m_Logger.Log(string.str().c_str());
-
-                return 0;
-            }, this);
+            m_Logger.Log(m_Database.Query(m_CurrentLine.Data()));
 
             m_CurrentLine.Clear();
 

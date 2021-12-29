@@ -46,12 +46,6 @@ public:
     void Run(){
         Clock cl;
 
-
-        m_Logger.Log(m_Procedures.GetExpensiveWaiters(300));
-        m_Logger.Log(m_Procedures.GetDrinksWith("Water"));
-
-        Println("Stacktrace: %\n", Stacktrace());
-
         for(;;){
             float dt = cl.GetElapsedTime().AsSeconds();
             cl.Restart();
