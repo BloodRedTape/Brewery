@@ -2,53 +2,7 @@
 #include <core/list.hpp>
 #include <core/print.hpp>
 #include <core/function.hpp>
-
-class QueryResult{
-private:
-    sqlite3_stmt *const m_Statement;
-
-    bool m_Status;
-public:
-    QueryResult(sqlite3_stmt *statement):
-            m_Statement(statement)
-    {
-        Reset();
-    }
-
-    ~QueryResult(){
-        sqlite3_finalize(m_Statement);
-    }
-
-    void Next(){
-        m_Status = sqlite3_step(m_Statement) == SQLITE_ROW;
-    }
-
-    void Reset(){
-        sqlite3_reset(m_Statement);
-        Next();
-    }
-
-    operator bool()const{
-        return m_Status;
-    }
-
-    int GetColumnInt(size_t index)const{
-        return sqlite3_column_int(m_Statement, index);
-    }
-
-    const char *GetColumnString(size_t index)const{
-        return (const char*)sqlite3_column_text(m_Statement, index);
-    }
-
-    float GetColumnFloat(size_t index)const{
-        return sqlite3_column_double(m_Statement, index);
-    }
-
-    double GetColumnDouble(size_t index)const{
-        return sqlite3_column_double(m_Statement, index);
-    }
-};
-
+#include <core/noncopyable.hpp>
 class Stmt{
 private:
     static constexpr size_t s_BufferSize = 4096;
@@ -70,6 +24,74 @@ public:
     }
 };
 
+class QueryResult{
+private:
+    sqlite3 *m_Database;
+    sqlite3_stmt *m_Query;
+    Stmt m_Statement;
+    bool m_Status;
+private:
+    friend class Database;
+    QueryResult(sqlite3 *db, const Stmt &stmt):
+        m_Database(db),
+        m_Statement(stmt)
+    {
+        sqlite3_prepare_v2(m_Database, stmt, -1, &m_Query, nullptr);
+        Reset();
+    }
+public:
+    QueryResult(const QueryResult &other):
+            QueryResult(other.m_Database, other.m_Statement)
+    {}
+
+    ~QueryResult(){
+        sqlite3_finalize(m_Query);
+    }
+    QueryResult &operator=(const QueryResult &other){
+        this->~QueryResult();
+        new (this) QueryResult(other);
+        return *this;
+    }
+
+    void Next(){
+        m_Status = sqlite3_step(m_Query) == SQLITE_ROW;
+    }
+
+    void Reset(){
+        sqlite3_reset(m_Query);
+        Next();
+    }
+
+    operator bool()const{
+        return m_Status;
+    }
+
+    int GetColumnInt(size_t index)const{
+        return sqlite3_column_int(m_Query, index);
+    }
+
+    const char *GetColumnString(size_t index)const{
+        return (const char*)sqlite3_column_text(m_Query, index);
+    }
+
+    float GetColumnFloat(size_t index)const{
+        return sqlite3_column_double(m_Query, index);
+    }
+
+    double GetColumnDouble(size_t index)const{
+        return sqlite3_column_double(m_Query, index);
+    }
+
+    const char *GetColumnName(size_t index)const{
+        return sqlite3_column_name(m_Query, index);
+    }
+
+    size_t GetColumnCount()const{
+        return sqlite3_column_count(m_Query);
+    }
+};
+
+
 class DatabaseLogger{
 private:
     List<std::string> m_Lines;
@@ -87,6 +109,21 @@ public:
         WriterPrint(writer, &buffer, fmt, Forward<ArgsType>(args)...);
 
         m_Lines.Add(Move(buffer));
+    }
+
+    void Log(QueryResult result){
+        Log("[QueryResult]:");
+        for(; result; result.Next()) {
+            std::stringstream string;
+            for(int i = 0;; i++){
+                string << result.GetColumnString(i);
+
+                if (i == result.GetColumnCount() - 1)break;
+
+                string << std::setw(20);
+            }
+            Log(string.str().c_str());
+        }
     }
 
     const List<std::string> &Lines()const{
@@ -135,10 +172,7 @@ public:
     }
 
     QueryResult Query(const Stmt &stmt){
-        sqlite3_stmt *sqlite_stmt = nullptr;
-        sqlite3_prepare_v2(m_Handle, stmt, -1, &sqlite_stmt, nullptr);
-
-        return {sqlite_stmt};
+        return {m_Handle, stmt};
     }
 
     size_t Size(const char *table_name){

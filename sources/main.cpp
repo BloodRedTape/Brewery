@@ -30,6 +30,8 @@ private:
     SourcesListPanel m_SourcesList{m_DB};
     GobletsListPanel m_GobletsList{m_DB};
 
+    StoredProcedures m_Procedures{m_DB};
+
 public:
     Application(){
         Function<void(const Event&)> handler;
@@ -38,13 +40,18 @@ public:
 
         m_Dockspace.Construct(m_Window.Size());
 
+
     }
 
     void Run(){
         Clock cl;
 
+
+        m_Logger.Log(m_Procedures.GetExpensiveWaiters(300));
+        m_Logger.Log(m_Procedures.GetDrinksWith("Water"));
+
         Println("Stacktrace: %\n", Stacktrace());
-        
+
         for(;;){
             float dt = cl.GetElapsedTime().AsSeconds();
             cl.Restart();

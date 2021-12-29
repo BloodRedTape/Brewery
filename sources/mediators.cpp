@@ -360,3 +360,33 @@ public:
         return m_Database.Size("Addresses");
     }
 };
+
+class StoredProcedures {
+    Database &m_Database;
+public:
+    StoredProcedures(Database &db) :
+            m_Database(db)
+    {}
+
+    QueryResult GetAllSourcesWithCity(const char *city){
+        return m_Database.Query(Stmt("SELECT * FROM Sources WHERE AddressID IN (SELECT ID FROM Addresses WHERE City = '%')", city));
+    }
+
+    QueryResult GetExpensiveWaiters(float salary_limit){
+        return m_Database.Query(Stmt("SELECT * FROM Waiters WHERE Salary > %", salary_limit));
+    }
+    
+    QueryResult GetDrinksWith(const char *ingredient_name){
+        return m_Database.Query(Stmt("SELECT * FROM Drinks WHERE Drinks.ID IN"
+                                     "(SELECT DrinkID FROM IngredientsDrinks WHERE IngredientID IN"
+                                     "(SELECT ID FROM Ingredients WHERE Name = '%'))", ingredient_name));
+    }
+
+    QueryResult GetIngredientsWithPriceLessThan(float price){
+        return m_Database.Query(Stmt("SELECT * FROM Ingredients WHERE PricePerUnit < %", price));
+    }
+
+    QueryResult GetGobletWithCapacityMoreThan(float capacity){
+        return m_Database.Query(Stmt("SELECT * FROM Goblets WHERE Capacity > %", capacity));
+    }
+};

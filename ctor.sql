@@ -1,6 +1,7 @@
 CREATE TABLE Addresses(
     ID int PRIMARY KEY NOT NULL,
     City varchar(64),
+    Street varchar(64),
     House varchar(2),
     PostalCode int
 );
@@ -15,6 +16,7 @@ CREATE TABLE Ingredients(
     ID int PRIMARY KEY NOT NULL,
     Name varchar(64) NOT NULL,
     Units varchar(64) NOT NULL,
+    PricePerUnit float NOT NULL,
     SourceID REFERENCES Sources(ID)
 );
 
