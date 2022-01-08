@@ -1,7 +1,9 @@
 #include <imgui/backend.hpp>
 #include <core/string.hpp>
+#include <core/function.hpp>
 #include <sstream>
 #include <iomanip>
+#include <unordered_map>
 #include "helpers.cpp"
 #include "mediators.cpp"
 
@@ -883,7 +885,7 @@ public:
 };
 
 
-class ConsoleWindow{
+class ConsoleWindow: public SimpleInterpreter{
 private:
     DatabaseLogger &m_Logger;
     InputBuffer<1024> m_CurrentLine;
@@ -895,7 +897,12 @@ public:
             m_Logger(logger),
             m_Database(db),
             m_History{""}
-    {}
+    {
+
+        Function<void(const char *)> on_clear;
+        on_clear.Bind<ConsoleWindow, &ConsoleWindow::OnClear>(this);
+        Register("clear",on_clear);
+    }
 
     void Draw(){
 
@@ -917,7 +924,11 @@ public:
         if(ImGui::InputText("##Input", m_CurrentLine.Data(), m_CurrentLine.Size(), ImGuiInputTextFlags_EnterReturnsTrue)){
             m_Logger.Log("[User]: %", m_CurrentLine.Data());
 
-            m_Logger.Log(m_Database.Query(m_CurrentLine.Data()));
+            if(!TryInterpret(m_CurrentLine.Data())) {
+                auto query = m_Database.Query(m_CurrentLine.Data());
+                if(query)
+                    m_Logger.Log(query);
+            }
 
             m_CurrentLine.Clear();
 
@@ -927,5 +938,9 @@ public:
         ImGui::PopItemWidth();
 
         ImGui::End();
+    }
+
+    void OnClear(const char *){
+        m_Logger.Clear();
     }
 };

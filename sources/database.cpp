@@ -1,8 +1,5 @@
 #include <sqlite3.h>
-#include <core/list.hpp>
-#include <core/print.hpp>
-#include <core/function.hpp>
-#include <core/noncopyable.hpp>
+
 class Stmt{
 private:
     static constexpr size_t s_BufferSize = 4096;
@@ -24,24 +21,59 @@ public:
     }
 };
 
+class DatabaseLogger{
+private:
+    List<std::string> m_Lines;
+public:
+
+    template<typename ...ArgsType>
+    void Log(const char *fmt, ArgsType&&...args){
+        std::string buffer;
+
+        const auto writer = [](char ch, void *data){
+            std::string &buffer = *(std::string*)data;
+            buffer.push_back(ch);
+        };
+
+        WriterPrint(writer, &buffer, fmt, Forward<ArgsType>(args)...);
+
+        m_Lines.Add(Move(buffer));
+    }
+
+    void Log(const class QueryResult &result);
+
+    const List<std::string> &Lines()const{
+        return m_Lines;
+    }
+
+    void Clear(){
+        m_Lines.Clear();
+    }
+};
+
 class QueryResult{
 private:
     sqlite3 *m_Database;
     sqlite3_stmt *m_Query;
+    DatabaseLogger &m_Logger;
     Stmt m_Statement;
-    bool m_Status;
+    bool m_Status = false;
 private:
     friend class Database;
-    QueryResult(sqlite3 *db, const Stmt &stmt):
+    QueryResult(sqlite3 *db, const Stmt &stmt, DatabaseLogger &logger):
         m_Database(db),
-        m_Statement(stmt)
+        m_Statement(stmt),
+        m_Logger(logger)
     {
-        sqlite3_prepare_v2(m_Database, stmt, -1, &m_Query, nullptr);
-        Reset();
+        if(sqlite3_prepare_v2(m_Database, stmt, -1, &m_Query, nullptr) != SQLITE_OK){
+             m_Logger.Log("[SQLite]: %", sqlite3_errmsg(m_Database));
+        }else {
+            Reset();
+        }
     }
 public:
     QueryResult(const QueryResult &other):
-            QueryResult(other.m_Database, other.m_Statement)
+            QueryResult(other.m_Database, other.m_Statement, other.m_Logger)
     {}
 
     ~QueryResult(){
@@ -91,45 +123,22 @@ public:
     }
 };
 
+void DatabaseLogger::Log(const class QueryResult &query){
+    auto result = query;
+    Log("[QueryResult]:");
+    for(; result; result.Next()) {
+        std::stringstream string;
+        for(int i = 0;; i++){
+            string << result.GetColumnString(i);
 
-class DatabaseLogger{
-private:
-    List<std::string> m_Lines;
-public:
+            if (i == result.GetColumnCount() - 1)break;
 
-    template<typename ...ArgsType>
-    void Log(const char *fmt, ArgsType&&...args){
-        std::string buffer;
-
-        const auto writer = [](char ch, void *data){
-            std::string &buffer = *(std::string*)data;
-            buffer.push_back(ch);
-        };
-
-        WriterPrint(writer, &buffer, fmt, Forward<ArgsType>(args)...);
-
-        m_Lines.Add(Move(buffer));
-    }
-
-    void Log(QueryResult result){
-        Log("[QueryResult]:");
-        for(; result; result.Next()) {
-            std::stringstream string;
-            for(int i = 0;; i++){
-                string << result.GetColumnString(i);
-
-                if (i == result.GetColumnCount() - 1)break;
-
-                string << std::setw(20);
-            }
-            Log(string.str().c_str());
+            string << std::setw(20);
         }
+        Log(string.str().c_str());
     }
+}
 
-    const List<std::string> &Lines()const{
-        return m_Lines;
-    }
-};
 
 class Database{
 private:
@@ -172,7 +181,7 @@ public:
     }
 
     QueryResult Query(const Stmt &stmt){
-        return {m_Handle, stmt};
+        return {m_Handle, stmt, m_Logger};
     }
 
     size_t Size(const char *table_name){
