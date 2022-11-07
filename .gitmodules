@@ -1,9 +1,9 @@
 [submodule "StraitXPackages/Base"]
 	path = StraitXPackages/Base
-	url = git@github.com:StraitX/Base.git
+	url = https://github.com/StraitX/Base.git
 [submodule "StraitXPackages/ImGui"]
 	path = StraitXPackages/ImGui
-	url = git@github.com:StraitX/ImGui.git
+	url = https://github.com/StraitX/ImGui.git
 [submodule "thirdparty/sqlite-amalgamation"]
 	path = thirdparty/sqlite-amalgamation
 	url = https://github.com/azadkuh/sqlite-amalgamation.git
