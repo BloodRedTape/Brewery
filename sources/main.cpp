@@ -73,6 +73,7 @@ public:
             }
             m_Swapchain.PresentCurrent(&m_End);
         }
+        GPU::WaitIdle();
     }
 
     void OnImGui(){
