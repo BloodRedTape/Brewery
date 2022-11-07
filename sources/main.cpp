@@ -6,14 +6,21 @@
 #include <core/os/stacktrace.hpp>
 #include <core/algorithm.hpp>
 #include <graphics/api/swapchain.hpp>
+#include <graphics/api/gpu.hpp>
 
 #include "windows.cpp"
 
 class Application{
 private:
-    AutoWindow m_Window{1280, 720, "Brewery"};
+    Window m_Window{1280, 720, "Brewery"};
     FramebufferChain m_Swapchain{&m_Window};
     ImGuiBackend m_Backend{m_Swapchain.Pass()};
+    UniquePtr<CommandPool> m_CmdPool{
+        CommandPool::Create()
+    };
+    UniquePtr<CommandBuffer, CommandBufferDeleter> m_CmdBuffer{
+        m_CmdPool->Alloc(), m_CmdPool.Get()
+    };
     float FramerateLimit = 60.f;
 
     Semaphore m_Begin, m_End;
@@ -34,18 +41,15 @@ private:
 
 public:
     Application(){
-        Function<void(const Event&)> handler;
-        handler.Bind<Application, &Application::OnEvent>(this);
-        m_Window.SetEventsHanlder(handler);
+        m_Window.SetEventsHandler({ this, &Application::OnEvent });
 
         m_Dockspace.Construct(m_Window.Size());
-
-
     }
 
     void Run(){
         Clock cl;
-
+        Fence fence;
+        fence.Signal();
         for(;;){
             float dt = cl.GetElapsedTime().AsSeconds();
             cl.Restart();
@@ -56,12 +60,17 @@ public:
             if(!m_Window.IsOpen())
                 break;
         
-            m_Swapchain.AcquireNext(&m_Begin);
             m_Backend.NewFrame(dt, Mouse::RelativePosition(m_Window), m_Window.Size());
-
             OnImGui();
 
-            m_Backend.RenderFrame(m_Swapchain.CurrentFramebuffer(), &m_Begin, &m_End);
+            m_Swapchain.AcquireNext(&m_Begin);
+            {
+                fence.WaitAndReset();
+                m_CmdBuffer->Begin();
+                m_Backend.CmdRenderFrame(m_CmdBuffer.Get(), m_Swapchain.CurrentFramebuffer());
+                m_CmdBuffer->End();
+                GPU::Execute(m_CmdBuffer.Get(), m_Begin, m_End, fence);
+            }
             m_Swapchain.PresentCurrent(&m_End);
         }
     }
@@ -91,9 +100,8 @@ public:
     }
 };
 
-int StraitXMain(Span<const char *> args){
+int main(){
     Application app;
-
     app.Run();
 
     return 0;

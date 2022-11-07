@@ -899,9 +899,7 @@ public:
             m_History{""}
     {
 
-        Function<void(const char *)> on_clear;
-        on_clear.Bind<ConsoleWindow, &ConsoleWindow::OnClear>(this);
-        Register("clear",on_clear);
+        Register("clear", {this, &ConsoleWindow::OnClear});
     }
 
     void Draw(){
@@ -913,7 +911,7 @@ public:
         ImGui::BeginChild("##Text", ImVec2(0, -footer_height_to_reserve));
 
         for(const auto &line: lines)
-            ImGui::TextWrapped("%s", line.c_str());
+            ImGui::TextWrapped("%s", line.Data());
 
         ImGui::EndChild();
 

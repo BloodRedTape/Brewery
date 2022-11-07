@@ -1,48 +1,33 @@
 #include <sqlite3.h>
+#include <core/string_print.hpp>
 
 class Stmt{
 private:
-    static constexpr size_t s_BufferSize = 4096;
-    char m_Buffer[s_BufferSize];
-    int m_Written = 0;
+    String m_Buffer;
 public:
     template<typename ...Args>
-    Stmt(const char *fmt, Args&&...args){
-        const auto writer = [](char ch, void *user_data){
-            Stmt *stmt = (Stmt*)user_data;
-            stmt->m_Buffer[stmt->m_Written++] = ch;
-        };
-
-        WriterPrint(writer, &m_Buffer, fmt, Forward<Args>(args)...);
-    }
+    Stmt(const char *fmt, Args&&...args):
+        m_Buffer(StringPrint(fmt, Forward<Args>(args)...))
+    {}
 
     operator const char *()const{
-        return m_Buffer;
+        return m_Buffer.Data();
     }
 };
 
 class DatabaseLogger{
 private:
-    List<std::string> m_Lines;
+    List<String> m_Lines;
 public:
 
     template<typename ...ArgsType>
     void Log(const char *fmt, ArgsType&&...args){
-        std::string buffer;
-
-        const auto writer = [](char ch, void *data){
-            std::string &buffer = *(std::string*)data;
-            buffer.push_back(ch);
-        };
-
-        WriterPrint(writer, &buffer, fmt, Forward<ArgsType>(args)...);
-
-        m_Lines.Add(Move(buffer));
+        m_Lines.Add(StringPrint(fmt, Forward<ArgsType>(args)...));
     }
 
     void Log(const class QueryResult &result);
 
-    const List<std::string> &Lines()const{
+    const List<String> &Lines()const{
         return m_Lines;
     }
 

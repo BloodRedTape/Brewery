@@ -29,17 +29,6 @@ public:
     }
 };
 
-struct AutoWindow: Window{
-    AutoWindow(int width, int height, const char *title){
-        Open(width, height, title);
-    }
-
-    ~AutoWindow(){
-        if(IsOpen())
-            Close();
-    }
-};
-
 class SimpleInterpreter{
 private:
     using CommandCallback = Function<void(const char*)>;
