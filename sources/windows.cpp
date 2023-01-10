@@ -696,6 +696,31 @@ private:
     int m_CurrentGobletID = -1;
     int m_CurrentWaiterID = -1;
 
+    int m_CurrentDay   = 0;
+    int m_CurrentMonth = 0;
+    int m_CurrentYear  = 2022;
+
+    static constexpr int DaysInMonth[] = {
+        31, 
+        27,
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31
+    };
+
+    static constexpr const char *Months[] = {
+        "Janyary", "February", "March", "April",   
+        "May",    "June",  "July",  "August", 
+        "September", "October", "November", "December"
+    };
+
     const char *const m_Name = "New Order";
 public:
     NewOrderPopup(Database &db):
@@ -801,16 +826,36 @@ public:
             }
 
             ImGui::Text("Checkout: %.2f", checkout);
+            
+            ImGui::Text("Date");
+            ImGui::SameLine();
+            ImGui::DragInt("##Day", &m_CurrentDay, 1.f, 1, DaysInMonth[m_CurrentMonth]);
+            ImGui::SameLine();
+
+            if (ImGui::BeginCombo("##MonthCombo", Months[m_CurrentMonth])) {
+                for (int i = 0; i < lengthof(Months); i++)
+                    if (ImGui::Selectable(Months[i]))
+                        m_CurrentMonth = i;
+                ImGui::EndCombo();
+            }
+            ImGui::SameLine();
+
+            ImGui::InputInt("##year", &m_CurrentYear);
 
             if (ImGui::Button("Place Order") && IsDataValid() && m_CurrentWaiterID != -1) {
-
-                int id = m_OrdersLogTable.Add(m_CustomerName.Data(), m_Tips, m_CurrentWaiterID, checkout);
+                Date date{
+                    m_CurrentDay + 1,
+                    m_CurrentMonth + 1,
+                    m_CurrentYear
+                };
+                int id = m_OrdersLogTable.Add(m_CustomerName.Data(), m_Tips, m_CurrentWaiterID, checkout, date);
 
                 for (auto drink: m_Drinks) {
                     m_DrinksOrdersTable.Add(id, drink.DrinkID, drink.GobletID);
                 }
                 ImGui::CloseCurrentPopup();
             }
+
 
             ImGui::SameLine();
 
@@ -948,7 +993,7 @@ public:
 
         
         if (ImPlot::BeginPlot("Checkouts stats")) {
-            ImPlot::PlotBars("My Bar Plot", checkouts_string.data(). dates.data(), checkouts.size(), 20);
+            //ImPlot::PlotBars("My Bar Plot", checkouts_string.data(), dates.data(), checkouts.size(), 20);
             ImPlot::EndPlot();
         }
         

@@ -1,5 +1,11 @@
 #include "database.cpp"
 
+struct Date{
+    int Day = 1;
+    int Month = 1;
+    int Year = 2020;
+};
+
 class DrinksTableMediator{
 private:
     Database &m_Database;
@@ -101,16 +107,19 @@ public:
         m_Database.Execute(Stmt("DELETE FROM OrdersLog"));
     }
 
-    int Add(const char *customer_name, float tips, int waiter_id, float checkout){
+    int Add(const char *customer_name, float tips, int waiter_id, float checkout, Date date){
         ++m_LastID;
         m_Database.Execute(
                 Stmt(
-                        "INSERT INTO OrdersLog(ID, CustomerShortName, Tips, WaiterID, Checkout, OrderDate) VALUES(%,'%',%,%, %, date('now'))",
+                        "INSERT INTO OrdersLog(ID, CustomerShortName, Tips, WaiterID, Checkout, OrderDate) VALUES(%,'%',%,%, %, '%-%-%')",
                         m_LastID,
                         customer_name,
                         tips,
                         waiter_id,
-                        checkout
+                        checkout,
+                        date.Year,
+                        date.Month,
+                        date.Day
                 )
         );
         return m_LastID;
