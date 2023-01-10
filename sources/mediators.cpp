@@ -101,15 +101,16 @@ public:
         m_Database.Execute(Stmt("DELETE FROM OrdersLog"));
     }
 
-    int Add(const char *customer_name, float tips, int waiter_id){
+    int Add(const char *customer_name, float tips, int waiter_id, float checkout){
         ++m_LastID;
         m_Database.Execute(
                 Stmt(
-                        "INSERT INTO OrdersLog(ID, CustomerShortName, Tips, WaiterID) VALUES(%,'%',%,%)",
+                        "INSERT INTO OrdersLog(ID, CustomerShortName, Tips, WaiterID, Checkout, OrderDate) VALUES(%,'%',%,%, %, date('now'))",
                         m_LastID,
                         customer_name,
                         tips,
-                        waiter_id
+                        waiter_id,
+                        checkout
                 )
         );
         return m_LastID;

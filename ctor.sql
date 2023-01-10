@@ -50,7 +50,9 @@ CREATE TABLE OrdersLog(
     ID int PRIMARY KEY NOT NULL,
     CustomerShortName varchar(64),
     Tips float,
-    WaiterID REFERENCES Waiters(ID)
+    WaiterID REFERENCES Waiters(ID),
+    Checkout float,
+    OrderDate date
 );
 
 CREATE TABLE DrinkOrders(

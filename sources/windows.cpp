@@ -349,7 +349,7 @@ public:
                 ImGui::TableNextColumn();
                 ImGui::Text("%s", query.GetColumnString(1));
                 ImGui::TableNextColumn();
-                ImGui::Text("%f", query.GetColumnFloat(2));
+                ImGui::Text("%.1f", query.GetColumnFloat(2));
             }
             ImGui::EndTable();
         }
@@ -688,13 +688,13 @@ private:
     WaitersTableMediator m_WaitersTable;
 
     InputBuffer<BufferSize> m_CustomerName;
-    InputBuffer<BufferSize> m_WaiterName;
     float m_Tips = 0.f;
 
     List<DrinkOrder> m_Drinks;
 
     int m_CurrentDrinkID = -1;
     int m_CurrentGobletID = -1;
+    int m_CurrentWaiterID = -1;
 
     const char *const m_Name = "New Order";
 public:
@@ -713,8 +713,23 @@ public:
     void Draw(){
 
         if(ImGui::BeginPopup(m_Name)) {
-            ImGui::InputText("CustomerName", m_CustomerName.Data(), m_CustomerName.Size());
-            ImGui::InputText("WaiterName", m_WaiterName.Data(), m_WaiterName.Size());
+            ImGui::InputText("Customer Codename", m_CustomerName.Data(), m_CustomerName.Size());
+            if (ImGui::BeginCombo("##WaitersCombo",
+                                  m_CurrentWaiterID != -1 ? m_WaitersTable.Query(m_CurrentWaiterID).GetColumnString(1) : "None")) {
+                auto waiters_query= m_WaitersTable.Query();
+                for (; waiters_query; waiters_query.Next()) {
+                    int id = waiters_query.GetColumnInt(0);
+                    const char *name = waiters_query.GetColumnString(1);
+
+                    if (ImGui::Selectable(name))
+                        m_CurrentWaiterID = id;
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::SameLine();
+
+            ImGui::Text("Waiter");
+
             ImGui::InputFloat("Tips", &m_Tips);
 
             auto selected_drink_query = m_DrinksTable.Query(m_CurrentDrinkID);
@@ -775,11 +790,21 @@ public:
                 ImGui::EndTable();
             }
 
-            if (ImGui::Button("Place Order") && IsDataValid() && m_WaitersTable.Exists(m_WaiterName.Data())) {
+            float checkout = 0;
 
-                QueryResult waiter = m_WaitersTable.Query(m_WaiterName.Data());
+            for (DrinkOrder drink_order : m_Drinks) {
+                QueryResult drink = m_DrinksTable.Query(drink_order.DrinkID);
+                QueryResult goblet = m_GobletsTable.Query(drink_order.GobletID);
+                float price_per_liter = drink.GetColumnFloat(2);
+                float capacity = goblet.GetColumnFloat(2);
+                checkout += price_per_liter * capacity;
+            }
 
-                int id = m_OrdersLogTable.Add(m_CustomerName.Data(), m_Tips, waiter.GetColumnInt(0));
+            ImGui::Text("Checkout: %.2f", checkout);
+
+            if (ImGui::Button("Place Order") && IsDataValid() && m_CurrentWaiterID != -1) {
+
+                int id = m_OrdersLogTable.Add(m_CustomerName.Data(), m_Tips, m_CurrentWaiterID, checkout);
 
                 for (auto drink: m_Drinks) {
                     m_DrinksOrdersTable.Add(id, drink.DrinkID, drink.GobletID);
@@ -795,13 +820,12 @@ public:
             ImGui::EndPopup();
         }else{
             m_CustomerName.Clear();
-            m_WaiterName.Clear();
             m_Drinks.Clear();
         }
     }
 private:
     bool IsDataValid(){
-        return m_Drinks.Size() && m_CustomerName.Length() && m_WaiterName.Length();
+        return m_Drinks.Size() && m_CustomerName.Length();
     }
 };
 
@@ -867,11 +891,13 @@ public:
                     ImGui::TableNextColumn();
                     ImGui::Text("%s", goblet.GetColumnString(1));
                     ImGui::TableNextColumn();
-                    ImGui::Text("%f", goblet.GetColumnFloat(2));
+                    ImGui::Text("%.1f", goblet.GetColumnFloat(2));
                 }
 
                 ImGui::EndTable();
             }
+            ImGui::Text("Checkout: %.2f", orders.GetColumnFloat(4));
+            ImGui::Text("Date: %s", orders.GetColumnString(5));
 
             ImGui::Separator();
         }
@@ -881,6 +907,53 @@ public:
         ImGui::End();
 
 
+    }
+};
+
+class AnalyticsWindow{
+private:
+    Database &m_DB;
+    DrinksTableMediator m_DrinksTable{m_DB};
+    OrdersLogTableMediator m_OrdersLogTable{m_DB};
+    DrinkOrdersTableMediator m_DrinkOrdersTable{m_DB};
+public:
+    AnalyticsWindow(Database &db): 
+        m_DB(db) 
+    {}
+
+    void Draw() {
+        ImGui::Begin("Stats");
+        
+        std::vector<std::string> dates;
+        std::vector<float> checkouts;
+
+        for (auto query = m_OrdersLogTable.Query(); query; query.Next()) {
+            float checkout = query.GetColumnFloat(4);
+            std::string date = query.GetColumnString(5) ? query.GetColumnString(5) : "Null";
+            auto it = std::find(dates.begin(), dates.end(), date);
+
+            if (it == dates.end()) {
+                dates.push_back(date);
+                checkouts.push_back(checkout);
+            } else {
+                size_t index = it - dates.begin();
+                checkouts[index] += checkout;
+            }
+        }
+        std::vector<std::string> checkouts_string;
+
+        for (auto checkout : checkouts)
+          ;
+        
+
+        
+        if (ImPlot::BeginPlot("Checkouts stats")) {
+            ImPlot::PlotBars("My Bar Plot", checkouts_string.data(). dates.data(), checkouts.size(), 20);
+            ImPlot::EndPlot();
+        }
+        
+
+        ImGui::End();
     }
 };
 
