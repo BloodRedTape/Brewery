@@ -47,7 +47,7 @@ public:
     Application(){
         ImPlot::CreateContext();
         m_Window.SetEventsHandler({ this, &Application::OnEvent });
-
+        
         m_Dockspace.Construct(m_Window.Size());
         
         auto &style = ImGui::GetStyle();

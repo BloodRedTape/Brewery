@@ -1,9 +1,116 @@
 #include "database.cpp"
+#include <tuple>
 
 struct Date{
     int Day = 1;
     int Month = 1;
     int Year = 2020;
+};
+
+template<typename...Types>
+using TableRow = std::tuple<Types...>;
+
+
+template<const char *Name, typename Type>
+struct TableColumnSpecification {};
+
+template <typename Type, size_t Index>
+struct Extracter {
+
+    static Type Extract(const QueryResult &result) {
+        static_assert(false, "");
+        return {};
+    }
+};
+
+template <size_t Index>
+struct Extracter<int, Index>{
+    static int Extract(const QueryResult &result) {
+        return result.GetColumnInt(Index);
+    }
+};
+
+template <size_t Index>
+struct Extracter<float, Index>{
+    static float Extract(const QueryResult &result) {
+        return result.GetColumnFloat(Index);
+    }
+};
+
+template <size_t Index>
+struct Extracter<double, Index>{
+    static double Extract(const QueryResult &result) {
+        return result.GetColumnDouble(Index);
+    }
+};
+
+template <size_t Index>
+struct Extracter<const char *, Index>{
+    static const char *Extract(const QueryResult &result) {
+        return result.GetColumnString(Index);
+    }
+};
+
+template<size_t Index, typename ...Types>
+void Assign(TableRow<Types...> &row, const QueryResult &result)
+{
+    using AssignType = std::remove_const_t<std::remove_reference_t<decltype(std::get<Index>(row))>>;
+    std::get<Index>(row) = Extracter<AssignType, Index>::Extract(result)
+}
+
+template <typename...Types>
+class TypedQueryResult{
+    QueryResult m_QueryResult;
+public:
+    TypedQueryResult(QueryResult query_result): 
+        m_QueryResult(query_result) 
+    {}
+
+    TableRow<Types> Current()const{ 
+        return MakeCurrent(std::make_index_sequence<sizeof..Types>());
+    }
+    
+    template <size_t ...Index>
+    TableRow<Types> MakeCurrent(std::index_sequence<Index...> seq) const
+    {
+        TableRow<Types> result;
+        std::initializer_list<int>{(Assign<Index>(result, m_QueryResult), 0)...};
+        return result;
+    }
+
+    void Next() { 
+        m_QueryResult.Next();
+    }
+
+    void Reset() { 
+        m_QueryResult.Reset();
+    }
+
+    operator bool() const{ 
+        return m_QueryResult;
+    }
+};
+
+template <const char *TableName>
+class TableMediator{
+private:
+    Database &m_DB;
+public:
+    TableMediator(Database &db): 
+        m_DB(db) 
+    {}
+#if 0
+    TypedQueryResult<Types> Query()
+    {
+        return m_Database.Query(Stmt("SELECT * FROM %", TableName));
+    }
+
+    template<const char *Name, template Type>
+    TypedQueryResult<Types> Query(Type value)
+    {
+        return m_Database.Query(Stmt("SELECT * FROM %", TableName));
+    }
+#endif
 };
 
 class DrinksTableMediator{
@@ -100,6 +207,10 @@ public:
 
     QueryResult Query(){
         return m_Database.Query(Stmt("SELECT * FROM OrdersLog"));
+    }
+
+    QueryResult Query(const Date &begin, const Date &end){
+        return m_Database.Query(Stmt("SELECT * FROM OrdersLog WHERE OrderDate BETWEEN '%-%-%' AND '%-%-%'", begin.Year, begin.Month, begin.Day, end.Year, end.Month, end.Day));
     }
 
     void Clear(){

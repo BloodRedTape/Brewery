@@ -4,8 +4,10 @@
 #include <sstream>
 #include <iomanip>
 #include <unordered_map>
+#include <map>
 #include "helpers.cpp"
 #include "mediators.cpp"
+#include "imgui_internal.h"
 
 class Dockspace{
 private:
@@ -36,6 +38,66 @@ public:
         ImGui::PopStyleVar(2);
     }
 };
+
+namespace ImGui
+{
+    void InputDate(const char *label, int &current_day, int &current_month, int &current_year)
+    {
+        ImGui::PushID(ImGui::GetID(label));
+
+        static constexpr int DaysInMonth[] = {
+            31, 
+            27,
+            31,
+            30,
+            31,
+            30,
+            31,
+            31,
+            30,
+            31,
+            30,
+            31
+        };
+
+        static constexpr const char *Months[] = {
+            "Janyary", "February", "March", "April",   
+            "May",    "June",  "July",  "August", 
+            "September", "October", "November", "December"
+        };
+
+        if (current_year < 0) current_year = 0;
+        if (current_month < 1) current_month = 1;
+        if (current_month > 12) current_month = 12;
+        if (current_month > 12) current_month = 12;
+        if (current_day < 1) current_day = 1;
+        if (current_day > DaysInMonth[current_month - 1]) current_day = DaysInMonth[current_month - 1];
+
+        ImGui::Text(label);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(60);
+        if (ImGui::DragInt("##Day", &current_day, 1.f, 1, DaysInMonth[current_month - 1]))
+            current_day + 1;
+        ImGui::SameLine();
+
+        ImGui::SetNextItemWidth(140);
+        if (ImGui::BeginCombo("##MonthCombo", Months[current_month - 1])) {
+            for (int i = 0; i < lengthof(Months); i++)
+                if (ImGui::Selectable(Months[i]))
+                    current_month = i + 1;
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+
+        ImGui::SetNextItemWidth(140);
+        ImGui::InputInt("##year", &current_year);
+        ImGui::PopID();
+    }
+
+    void InputDate(const char* label, Date& date) {
+        return InputDate(label, date.Day, date.Month, date.Year);
+    }
+}
 
 class NewIngredientPopup{
     static constexpr size_t BufferSize = 1024;
@@ -700,27 +762,6 @@ private:
     int m_CurrentMonth = 0;
     int m_CurrentYear  = 2022;
 
-    static constexpr int DaysInMonth[] = {
-        31, 
-        27,
-        31,
-        30,
-        31,
-        30,
-        31,
-        31,
-        30,
-        31,
-        30,
-        31
-    };
-
-    static constexpr const char *Months[] = {
-        "Janyary", "February", "March", "April",   
-        "May",    "June",  "July",  "August", 
-        "September", "October", "November", "December"
-    };
-
     const char *const m_Name = "New Order";
 public:
     NewOrderPopup(Database &db):
@@ -827,25 +868,12 @@ public:
 
             ImGui::Text("Checkout: %.2f", checkout);
             
-            ImGui::Text("Date");
-            ImGui::SameLine();
-            ImGui::DragInt("##Day", &m_CurrentDay, 1.f, 1, DaysInMonth[m_CurrentMonth]);
-            ImGui::SameLine();
-
-            if (ImGui::BeginCombo("##MonthCombo", Months[m_CurrentMonth])) {
-                for (int i = 0; i < lengthof(Months); i++)
-                    if (ImGui::Selectable(Months[i]))
-                        m_CurrentMonth = i;
-                ImGui::EndCombo();
-            }
-            ImGui::SameLine();
-
-            ImGui::InputInt("##year", &m_CurrentYear);
+            ImGui::InputDate("Date", m_CurrentDay, m_CurrentMonth, m_CurrentYear);
 
             if (ImGui::Button("Place Order") && IsDataValid() && m_CurrentWaiterID != -1) {
                 Date date{
-                    m_CurrentDay + 1,
-                    m_CurrentMonth + 1,
+                    m_CurrentDay,
+                    m_CurrentMonth,
                     m_CurrentYear
                 };
                 int id = m_OrdersLogTable.Add(m_CustomerName.Data(), m_Tips, m_CurrentWaiterID, checkout, date);
@@ -959,8 +987,33 @@ class AnalyticsWindow{
 private:
     Database &m_DB;
     DrinksTableMediator m_DrinksTable{m_DB};
+    WaitersTableMediator m_WaitersTable{m_DB};
     OrdersLogTableMediator m_OrdersLogTable{m_DB};
     DrinkOrdersTableMediator m_DrinkOrdersTable{m_DB};
+
+    Date m_WaitersBegin{1, 1, 2020};
+    Date m_WaitersEnd{1, 1, 2024};
+
+    Date m_DrinkMarketBegin{1, 1, 2020};
+    Date m_DrinkMarketEnd{1, 1, 2024};
+
+private:
+    static double DateToDouble(std::string date) {
+        int day;
+        int month;
+        int year;
+        sscanf(date.data(), "%d-%d-%d", &year, &month, &day);
+
+        return year * 10000 + month * 100 + day * 1;
+    }
+
+    static String DoubleToDate(double date) {
+        int day = (int)date % 100;
+        int month = ((int)date / 100) % 100;
+        int year = (int)date / 10000;
+        return StringPrint("%-%-%", year, month, day);
+    }
+   
 public:
     AnalyticsWindow(Database &db): 
         m_DB(db) 
@@ -969,34 +1022,102 @@ public:
     void Draw() {
         ImGui::Begin("Stats");
         
-        std::vector<std::string> dates;
-        std::vector<float> checkouts;
+        
+        std::unordered_map<std::string, float> checkouts;
 
         for (auto query = m_OrdersLogTable.Query(); query; query.Next()) {
             float checkout = query.GetColumnFloat(4);
             std::string date = query.GetColumnString(5) ? query.GetColumnString(5) : "Null";
-            auto it = std::find(dates.begin(), dates.end(), date);
-
-            if (it == dates.end()) {
-                dates.push_back(date);
-                checkouts.push_back(checkout);
-            } else {
-                size_t index = it - dates.begin();
-                checkouts[index] += checkout;
-            }
+            
+            checkouts[date] += checkout;
         }
-        std::vector<std::string> checkouts_string;
 
-        for (auto checkout : checkouts)
-          ;
-        
+        const auto win_size = ImGui::GetContentRegionAvail();
+        const int plot_count = 3;
+        const auto plot_size = ImVec2{win_size.x * 0.6f, win_size.y * 0.6f};
 
+        ImGui::InputDate("Waiters Start", m_WaitersBegin);
+
+        ImGui::InputDate("Waiters End", m_WaitersEnd);
         
-        if (ImPlot::BeginPlot("Checkouts stats")) {
-            //ImPlot::PlotBars("My Bar Plot", checkouts_string.data(), dates.data(), checkouts.size(), 20);
+        if (ImPlot::BeginPlot("Waiters stats", plot_size)) {
+            List<String> names;
+            List<float> values;
+            List<const char *> names_ptr;
+
+            std::map<int, int> orders_by_waiter;
+
+            for (auto query = m_OrdersLogTable.Query(m_WaitersBegin, m_WaitersEnd); query; query.Next()) {
+                int waiter_id = query.GetColumnInt(3);
+
+                orders_by_waiter[waiter_id] += 1;
+            }
+
+            for (auto [waiter_id, orders] : orders_by_waiter) {
+                auto query = m_WaitersTable.Query(waiter_id);
+                auto waiter_name = query.GetColumnString(1);
+                names.Add(waiter_name);
+                names_ptr.Add(names.Last().Data());
+                values.Add(orders);
+            }
+
+            float sum = 0;
+            
+            for (auto value : values) 
+                sum += value; 
+
+            for (float &value : values) value = (value / sum) * 100;
+
+
+            ImPlot::PlotPieChart(names_ptr.Data(), values.Data(), values.Size(),
+                                 0, 0, 1, "%.1f%%");
+
             ImPlot::EndPlot();
         }
-        
+
+        ImGui::InputDate("Market Share Start", m_DrinkMarketBegin);
+
+        ImGui::InputDate("Market Share End", m_DrinkMarketEnd);
+
+        if (ImPlot::BeginPlot("Drinks market share", plot_size)) {
+             
+            List<String> names;
+            List<float> values;
+            List<const char *> names_ptr;
+
+            std::map<int, int> drink_market_share;
+
+            for (auto query = m_OrdersLogTable.Query(m_DrinkMarketBegin, m_DrinkMarketEnd); query; query.Next()) {
+                int order_id = query.GetColumnInt(0);
+
+                for (auto order_drink = m_DrinkOrdersTable.Query(order_id); order_drink; order_drink.Next()) {
+                    int drink_id = order_drink.GetColumnInt(1);
+
+                    drink_market_share[drink_id] += 1;
+                }
+            }
+
+            for (auto [drink_id, bought] : drink_market_share) {
+                auto query = m_DrinksTable.Query(drink_id);
+                auto drink_name = query.GetColumnString(1);
+                names.Add(drink_name);
+                names_ptr.Add(names.Last().Data());
+                values.Add(bought);
+            }
+
+            float sum = 0;
+            
+            for (auto value : values) 
+                sum += value; 
+
+            for (float &value : values) value = (value / sum) * 100;
+
+
+            ImPlot::PlotPieChart(names_ptr.Data(), values.Data(), values.Size(),
+                                 0, 0, 1, "%.1f%%");
+
+            ImPlot::EndPlot();
+        }        
 
         ImGui::End();
     }
