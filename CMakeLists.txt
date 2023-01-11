@@ -11,13 +11,14 @@ add_subdirectory(thirdparty/sqlite-amalgamation)
 
 set(BREWERY_SOURCES
     sources/main.cpp
-    sources/implot.cpp
-    sources/implot_demo.cpp
-    sources/implot_items.cpp
+    thirdparty/implot/implot.cpp
+    thirdparty/implot/implot_demo.cpp
+    thirdparty/implot/implot_items.cpp
 )
 
 set(BREWERY_INCLUDE
     sources/
+	thirdparty/implot/
 )
 
 add_executable(Brewery ${BREWERY_SOURCES})

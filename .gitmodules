@@ -7,3 +7,6 @@
 [submodule "thirdparty/sqlite-amalgamation"]
 	path = thirdparty/sqlite-amalgamation
 	url = https://github.com/azadkuh/sqlite-amalgamation.git
+[submodule "thirdparty/implot"]
+	path = thirdparty/implot
+	url = https://github.com/epezent/implot
