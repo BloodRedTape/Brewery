@@ -35,8 +35,10 @@ private:
     DrinksListPanel m_DrinksList{m_DB};
     OrdersLogPanel m_OrdersLog{m_DB};
     WaitersListPanel m_WaitersList{m_DB};
-    SourcesListPanel m_SourcesList{m_DB};
+    DrinksTransferProgressWindow m_DrinksTransfer;
+    SourcesListPanel m_SourcesList{m_DB, m_DrinksTransfer};
     GobletsListPanel m_GobletsList{m_DB};
+
 
     AnalyticsWindow m_Analytics{m_DB};
 
@@ -149,6 +151,7 @@ public:
         m_SourcesList.Draw();
         m_GobletsList.Draw();
         m_Analytics.Draw();
+        m_DrinksTransfer.Draw();
         //ImGui::ShowDemoWindow();
     }
 

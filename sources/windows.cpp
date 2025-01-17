@@ -4,6 +4,7 @@
 #include <sstream>
 #include <iomanip>
 #include <unordered_map>
+#include <functional>
 #include <map>
 #include "helpers.cpp"
 #include "mediators.cpp"
@@ -492,6 +493,114 @@ private:
     }
 };
 
+enum class TransferStatus: int{
+    Placed = 0,
+    Accepted = 1,
+    Brewing = 2,
+    Transfering = 3,
+    Done = 4,
+    Max
+};
+
+static constexpr const char *TransferStatusNames[] = {
+    "Placed",
+    "Accepted",
+    "Brewing",
+    "Transfering",
+    "Done",
+    "INTERNAL_MAX"
+};
+
+using Item = std::pair<std::string, float>;
+
+struct TransferEntry{
+    int ID = 0;
+    std::string Source;
+
+    std::vector<Item> Items;
+
+    TransferStatus Status = TransferStatus::Placed;
+    
+    std::function<void(const std::vector<Item> &items)> OnDone;
+
+    void Draw(){
+        ImGui::PushID(ID);
+        ImGui::Text("Order ID: %d", ID);
+        ImGui::Text("Status: %s", TransferStatusNames[(int)Status]);
+
+        float color = float(Status) / float((int)TransferStatus::Max - 1);
+
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor::HSV(color, 0.5f, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, (ImVec4)ImColor::HSV(color, 0.6f, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgActive, (ImVec4)ImColor::HSV(color, 0.7f, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_SliderGrab, (ImVec4)ImColor::HSV(color, 0.9f, 0.9f));
+        ImGui::SliderInt("##Status", (int*)&Status, 0, (int)TransferStatus::Max - 1, "");
+        ImGui::PopStyleColor(4);
+        
+        if (ImGui::TreeNode("Drinks"))
+        {
+            for (auto item : Items) 
+                ImGui::BulletText("%s %.2f", item.first.c_str(), item.second);
+
+            ImGui::TreePop();
+        }
+
+        if (Status != TransferStatus::Done) {
+            if (ImGui::Button("Fake Done")) {
+                if(OnDone) OnDone(Items);
+
+                Status = TransferStatus::Done;
+            }
+        }
+
+        ImGui::PopID();
+    }
+};
+
+struct DrinksTransferProgressWindow {
+    std::vector<TransferEntry> Entries;
+    
+    DrinksTransferProgressWindow() {
+        Entries.push_back({
+            0,
+            "Granny",
+            {
+                {"Cider", 1.f}
+            },
+            TransferStatus::Accepted
+        });
+
+        Entries.push_back({
+            1,
+            "Granny",
+            {
+                {"Cider", 1.f}
+            },
+            TransferStatus::Brewing
+        });
+
+
+        Entries.push_back({
+            2,
+            "Someone",
+            {
+                {"Cider", 1.f}
+            },
+            TransferStatus::Done
+        });
+    }
+
+    void Draw(){
+        ImGui::Begin("Transfer Progress");
+        
+        for (auto& Entry : Entries) {
+            Entry.Draw();
+            ImGui::Separator();
+        }
+        ImGui::End();
+    }
+};
+
 class NewDrinkOrderPopup{
     static constexpr size_t BufferSize = 1024;
 private:
@@ -500,17 +609,23 @@ private:
     const char *const m_Name = "New Drink Order";
     
     std::map<std::string, int> m_OrderCounts;
+	DrinksTransferProgressWindow &m_Transfer;
+    std::string m_Source;
 public:
-    NewDrinkOrderPopup(Database &db):
-        m_DrinksTable(db)
+    NewDrinkOrderPopup(Database &db, DrinksTransferProgressWindow &transfer):
+        m_DrinksTable(db),
+        m_Transfer(transfer)
     {}
 
-    void Open(){
+    void Open(const std::string &source){
         ImGui::OpenPopup(m_Name);
+        m_Source = source;
     }
 
     void Draw(){
         if(ImGui::BeginPopup(m_Name)) {
+
+            ImGui::Text("Order from: %s", m_Source.c_str());
 
             for (auto query = m_DrinksTable.Query(); query; query.Next()) {
                 auto name = query.GetColumnString(1);
@@ -522,17 +637,35 @@ public:
                 ImGui::Text("Available: %.2f, ", GetAvailableDrinks(name));
                 ImGui::SameLine();
                 ImGui::InputInt("Count", &count);
-                ImGui::SameLine();
 
-                if (ImGui::Button("Order")) {
-                    GetAvailableDrinks(name) += count;
-                    count = 0;
-                }
                 ImGui::PopID();
             }
 
-            if (ImGui::Button("Close"))
+            if (ImGui::Button("Place Order")){
+                std::vector<Item> items;
+
+                for (auto order : m_OrderCounts) if(order.second > 0) items.push_back(order);
+
+                m_Transfer.Entries.push_back({
+                    (int)m_Transfer.Entries.size(),
+                    m_Source,
+                    items,
+                    TransferStatus::Placed
+                });
+
+                m_Transfer.Entries.back().OnDone = [](const std::vector<Item> &items) {
+                    for (auto item : items) {
+                        GetAvailableDrinks(item.first.c_str()) += item.second;
+                    }
+                };
                 ImGui::CloseCurrentPopup();
+                m_OrderCounts = {};
+            }
+
+            if (ImGui::Button("Cancel")){
+                ImGui::CloseCurrentPopup();
+                m_OrderCounts = {};
+            }
 
             ImGui::EndPopup();
         }else{
@@ -549,15 +682,14 @@ private:
 
     NewDrinkOrderPopup m_DrinkOrderPopup;
 public:
-    SourcesListPanel(Database &db):
+    SourcesListPanel(Database &db, DrinksTransferProgressWindow &transfer):
             m_SourcesTable(db),
             m_AddressesTable(db),
             m_NewSourcePopup(db),
-            m_DrinkOrderPopup(db)
+            m_DrinkOrderPopup(db, transfer)
     {}
 
     void Draw(){
-
         ImGui::Begin("Sources");
 
         if(ImGui::Button("Clear"))
@@ -595,7 +727,7 @@ public:
                 ImGui::Text("%d", query.GetColumnInt(3));
                 ImGui::TableNextColumn();
                 if (ImGui::Button("Order")) {
-                    m_DrinkOrderPopup.Open();
+                    m_DrinkOrderPopup.Open(query.GetColumnString(1));
                 }
                 m_DrinkOrderPopup.Draw();
 
