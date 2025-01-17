@@ -35,7 +35,6 @@ private:
     DrinksListPanel m_DrinksList{m_DB};
     OrdersLogPanel m_OrdersLog{m_DB};
     WaitersListPanel m_WaitersList{m_DB};
-    IngredientsListPanel m_IngredientsList{m_DB};
     SourcesListPanel m_SourcesList{m_DB};
     GobletsListPanel m_GobletsList{m_DB};
 
@@ -147,7 +146,6 @@ public:
         m_DrinksList.Draw();
         m_OrdersLog.Draw();
         m_WaitersList.Draw();
-        m_IngredientsList.Draw();
         m_SourcesList.Draw();
         m_GobletsList.Draw();
         m_Analytics.Draw();

@@ -9,6 +9,15 @@
 #include "mediators.cpp"
 #include "imgui_internal.h"
 
+static std::map<std::string, float> s_Available;
+
+float& GetAvailableDrinks(const char* name) {
+    if(!s_Available.count(name))
+        s_Available[name] = rand() % 20;
+
+    return s_Available[name];
+}
+
 class Dockspace{
 private:
     const Vector2s m_WindowSize;
@@ -483,16 +492,68 @@ private:
     }
 };
 
+class NewDrinkOrderPopup{
+    static constexpr size_t BufferSize = 1024;
+private:
+    DrinksTableMediator m_DrinksTable;
+
+    const char *const m_Name = "New Drink Order";
+    
+    std::map<std::string, int> m_OrderCounts;
+public:
+    NewDrinkOrderPopup(Database &db):
+        m_DrinksTable(db)
+    {}
+
+    void Open(){
+        ImGui::OpenPopup(m_Name);
+    }
+
+    void Draw(){
+        if(ImGui::BeginPopup(m_Name)) {
+
+            for (auto query = m_DrinksTable.Query(); query; query.Next()) {
+                auto name = query.GetColumnString(1);
+                int &count = m_OrderCounts[name];
+
+                ImGui::PushID(query.GetColumnInt(0));
+                ImGui::Text("%s", name);
+                ImGui::SameLine();
+                ImGui::Text("Available: %.2f, ", GetAvailableDrinks(name));
+                ImGui::SameLine();
+                ImGui::InputInt("Count", &count);
+                ImGui::SameLine();
+
+                if (ImGui::Button("Order")) {
+                    GetAvailableDrinks(name) += count;
+                    count = 0;
+                }
+                ImGui::PopID();
+            }
+
+            if (ImGui::Button("Close"))
+                ImGui::CloseCurrentPopup();
+
+            ImGui::EndPopup();
+        }else{
+        }
+    }
+};
+
+
 class SourcesListPanel{
 private:
     SourcesTableMediator m_SourcesTable;
     AddressesTableMediator m_AddressesTable;
     NewSourcePopup m_NewSourcePopup;
+
+    NewDrinkOrderPopup m_DrinkOrderPopup;
 public:
     SourcesListPanel(Database &db):
             m_SourcesTable(db),
             m_AddressesTable(db),
-            m_NewSourcePopup(db)
+            m_NewSourcePopup(db),
+            m_DrinkOrderPopup(db)
     {}
 
     void Draw(){
@@ -516,12 +577,12 @@ public:
         if(ImGui::BeginTable("Sources", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
             ImGui::TableSetupColumn("Name");
             ImGui::TableSetupColumn("City");
-            ImGui::TableSetupColumn("House");
             ImGui::TableSetupColumn("PostalCode");
             ImGui::TableHeadersRow();
 
             QueryResult query = m_SourcesTable.Query();
             for( ;query; query.Next()){
+                ImGui::PushID(query.GetColumnInt(0));
 
                 auto address = m_AddressesTable.Query(query.GetColumnInt(2));
 
@@ -531,9 +592,14 @@ public:
                 ImGui::TableNextColumn();
                 ImGui::Text("%s", address.GetColumnString(1));
                 ImGui::TableNextColumn();
-                ImGui::Text("%s", query.GetColumnString(2));
-                ImGui::TableNextColumn();
                 ImGui::Text("%d", query.GetColumnInt(3));
+                ImGui::TableNextColumn();
+                if (ImGui::Button("Order")) {
+                    m_DrinkOrderPopup.Open();
+                }
+                m_DrinkOrderPopup.Draw();
+
+                ImGui::PopID();
             }
             ImGui::EndTable();
         }
@@ -684,10 +750,13 @@ public:
 
         QueryResult query = m_DrinksTable.Query();
 
-        if(ImGui::BeginTable("Drinks", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
+
+        if(ImGui::BeginTable("Drinks", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)){
             ImGui::TableSetupColumn("Name");
             ImGui::TableSetupColumn("Price");
             ImGui::TableSetupColumn("AgeRestr");
+            ImGui::TableSetupColumn("Available");
+
             ImGui::TableHeadersRow();
             for( ;query; query.Next()){
                 ImGui::TableNextRow();
@@ -719,6 +788,8 @@ public:
                 ImGui::Text("%f", query.GetColumnFloat(2));
                 ImGui::TableNextColumn();
                 ImGui::Text("%d", query.GetColumnInt(3));
+                ImGui::TableNextColumn();
+                ImGui::Text("%.1f Liters", GetAvailableDrinks(query.GetColumnString(1)));
 
             }
             ImGui::EndTable();
@@ -776,6 +847,41 @@ public:
         ImGui::OpenPopup(m_Name);
     }
 
+    std::map<std::string, float> Usage() {
+        std::map<std::string, float> usage;
+
+        for(auto drink: m_Drinks){
+            auto drink_query = m_DrinksTable.Query(drink.DrinkID);
+            auto goblet_query = m_GobletsTable.Query(drink.GobletID);
+
+            if (!drink_query || !goblet_query)continue;
+            
+            usage[drink_query.GetColumnString(1)] += goblet_query.GetColumnFloat(2);
+        }
+
+        return usage;
+    }
+
+    float AvailableLiters(const char* name) {
+        if(!name)
+            return 0;
+
+        auto res = GetAvailableDrinks(name) - Usage()[name];
+
+        if(res >= 0)
+            return res;
+
+        return 0;
+    }
+
+    bool IsAvailable(const char* name) {
+        return AvailableLiters(name) > 0;
+    }
+
+    bool IsAvailableForGoblet(const char* name, float capacity) {
+        return AvailableLiters(name) >= capacity;
+    }
+
     void Draw(){
 
         if(ImGui::BeginPopup(m_Name)) {
@@ -802,32 +908,57 @@ public:
 
             ImGui::PushItemWidth(ImGui::GetWindowSize().x / 3);
 
+            auto current_name = selected_drink_query.GetColumnString(1);
+
+            if(!IsAvailable(current_name))
+                m_CurrentDrinkID = -1;
+
             if (ImGui::BeginCombo("##DrinksCombo",
-                                  selected_drink_query ? selected_drink_query.GetColumnString(1) : "None")) {
+                                  IsAvailable(current_name) ? current_name : "None")) {
                 auto drink_query = m_DrinksTable.Query();
                 for (; drink_query; drink_query.Next()) {
                     int id = drink_query.GetColumnInt(0);
                     const char *name = drink_query.GetColumnString(1);
 
-                    if (ImGui::Selectable(name))
+                    bool is_available = IsAvailable(name);
+
+                    std::string selectable = name;
+                    
+                    if(!is_available)ImGui::PushDisabled();
+
+                    if (ImGui::Selectable(selectable.c_str()))
                         m_CurrentDrinkID = id;
+
+                    if(!is_available)ImGui::PopDisabled();
                 }
                 ImGui::EndCombo();
             }
 
+          if(m_CurrentDrinkID != -1){
             ImGui::SameLine();
+             
+            float current_capacity = m_GobletsTable.Query(m_CurrentGobletID).GetColumnFloat(2);
+
+            if(!IsAvailableForGoblet(current_name, current_capacity))
+                m_CurrentGobletID = -1;
 
             if (ImGui::BeginCombo("##GobletsCombo", GetGobletName(m_GobletsTable.Query(m_CurrentGobletID)).c_str())) {
                 auto goblet_query = m_GobletsTable.Query();
                 for (; goblet_query; goblet_query.Next()) {
                     int id = goblet_query.GetColumnInt(0);
+                    float capacity = goblet_query.GetColumnFloat(2);
                     std::string name = GetGobletName(goblet_query);
 
+                    bool is_available = IsAvailableForGoblet(current_name, capacity);
+
+                    if(!is_available)ImGui::PushDisabled();
                     if (ImGui::Selectable(name.c_str()))
                         m_CurrentGobletID = id;
+                    if(!is_available)ImGui::PopDisabled();
                 }
                 ImGui::EndCombo();
             }
+          }
 
             ImGui::SameLine();
 
@@ -881,6 +1012,11 @@ public:
                 for (auto drink: m_Drinks) {
                     m_DrinksOrdersTable.Add(id, drink.DrinkID, drink.GobletID);
                 }
+
+                for (auto usage : Usage()) {
+                    GetAvailableDrinks(usage.first.c_str()) -= usage.second;
+                }
+
                 ImGui::CloseCurrentPopup();
             }
 
@@ -893,6 +1029,7 @@ public:
             ImGui::EndPopup();
         }else{
             m_CustomerName.Clear();
+
             m_Drinks.Clear();
         }
     }
